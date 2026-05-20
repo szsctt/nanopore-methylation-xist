@@ -1,0 +1,57 @@
+# Core inputs
+sample_table: "config/samples.tsv"
+reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+reference_url: "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz"
+
+# Minimap2 settings
+minimap2:
+  preset: "map-ont"
+
+# XIST-focused region 
+xist_region:
+  chrom: "chrX"
+  start: 73813879
+  end: 73862026
+
+# SNP filtering prior to phasing and for the XIST subset
+# Defaults inferred from previous_results and can be tuned.
+snp_filter:
+  min_q: 800
+
+# Clair3 settings
+clair3:
+  platform: "ont"
+
+# Clair3 model download (auto-fetched by workflow)
+# This workflow currently uses Clair3 container 0.1-r12 (TensorFlow era),
+# so use models from clair3_models/ (not clair3_models_pytorch/).
+clair3_model:
+  name: "r941_prom_hac_g360+g422"
+  source_url: "http://www.bio8.cs.hku.hk/clair3/clair3_models/r941_prom_hac_g360+g422.tar.gz"
+
+# NanoMethPhase DMA settings
+# Column mapping for methylation-frequency files
+# chromosome,start,NumOfAllCalls,NumOfModCalls,MethylFreq
+dma:
+  columns: "1,2,4,5,7"
+
+threads:
+  align: 16
+  samtools_sort: 16
+  clair3: 24
+  whatshap: 12
+  nanopolish: 24
+  methyl_call_processor: 12
+  nanomethphase_phase: 16
+  dma: 4
+
+# Singularity sources (docker:// URIs).
+# Validate tags in your environment; adjust if your cluster caches different builds.
+containers:
+  minimap2: "docker://quay.io/biocontainers/minimap2:2.28--h577a1d6_0"
+  samtools: "docker://quay.io/biocontainers/samtools:1.19--h50ea8bc_0"
+  vcftools: "docker://quay.io/biocontainers/vcftools:0.1.16--pl5321hdcf5f25_9"
+  whatshap: "docker://quay.io/biocontainers/whatshap:2.2--py39hdf45acc_0"
+  nanopolish: "docker://quay.io/biocontainers/nanopolish:0.14.0--h773013f_6"
+  clair3: "docker://quay.io/biocontainers/clair3:0.1-r12--hdfd78af_0"
+  nanomethphase: "docker://quay.io/biocontainers/nanomethphase:1.2.0--pyhdfd78af_0"
