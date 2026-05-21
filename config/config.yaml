@@ -48,10 +48,12 @@ threads:
 # Singularity sources (docker:// URIs).
 # Validate tags in your environment; adjust if your cluster caches different builds.
 containers:
-  minimap2: "docker://quay.io/biocontainers/minimap2:2.28--h577a1d6_0"
-  samtools: "docker://quay.io/biocontainers/samtools:1.19--h50ea8bc_0"
-  vcftools: "docker://quay.io/biocontainers/vcftools:0.1.16--pl5321hdcf5f25_9"
-  whatshap: "docker://quay.io/biocontainers/whatshap:2.2--py39hdf45acc_0"
-  nanopolish: "docker://quay.io/biocontainers/nanopolish:0.14.0--h773013f_6"
-  clair3: "docker://quay.io/biocontainers/clair3:0.1-r12--hdfd78af_0"
-  nanomethphase: "docker://quay.io/biocontainers/nanomethphase:1.2.0--pyhdfd78af_0"
+  minimap2: "docker://quay.io/biocontainers/minimap2:2.31--h118bc1c_0"
+  samtools: "docker://quay.io/biocontainers/samtools:1.23.1--ha83d96e_0"
+  vcftools: "docker://quay.io/biocontainers/vcftools:0.1.17--pl5321h077b44d_0"
+  whatshap: "docker://quay.io/biocontainers/whatshap:2.8--py312hf731ba3_0"
+  nanopolish: "docker://quay.io/biocontainers/nanopolish:0.14.0--h5ca1c30_6"
+  # Built via .github/workflows/build-custom-tool-images.yml
+  # Replace YOUR_DOCKERHUB_USERNAME with your Docker Hub namespace.
+  clair3: "docker://docker.io/YOUR_DOCKERHUB_USERNAME/clair3:latest"
+  nanomethphase: "docker://docker.io/YOUR_DOCKERHUB_USERNAME/nanomethphase:latest"
