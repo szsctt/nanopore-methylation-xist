@@ -74,11 +74,7 @@ jobs:
         shell: bash
         run: |
           if [[ ! -f src/entrypoint.sh ]]; then
-            cat > src/entrypoint.sh <<'EOS'
-            #!/usr/bin/env bash
-            set -euo pipefail
-            exec "$@"
-            EOS
+            printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec "$@"' > src/entrypoint.sh
             chmod +x src/entrypoint.sh
           fi
 
