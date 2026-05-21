@@ -1,0 +1,104 @@
+name: Build Custom Clair3 and NanoMethPhase Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      clair3_ref:
+        description: "Git ref for HKU-BAL/Clair3 (branch, tag, or SHA)"
+        required: false
+        default: "main"
+      nanomethphase_ref:
+        description: "Git ref for vahidAK/NanoMethPhase (branch, tag, or SHA)"
+        required: false
+        default: "master"
+      push_latest:
+        description: "Also push :latest tags"
+        required: false
+        default: true
+        type: boolean
+  schedule:
+    - cron: "0 3 * * 1"
+
+jobs:
+  build-and-push:
+    name: Build and push ${{ matrix.tool }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - tool: clair3
+            repo: HKU-BAL/Clair3
+            default_ref: main
+            dockerfile: Dockerfile
+            image_name: clair3
+          - tool: nanomethphase
+            repo: vahidAK/NanoMethPhase
+            default_ref: master
+            dockerfile: Dockerfile
+            image_name: nanomethphase
+
+    steps:
+      - name: Resolve upstream ref
+        id: resolve
+        shell: bash
+        run: |
+          if [[ "${{ matrix.tool }}" == "clair3" ]]; then
+            REF_INPUT='${{ github.event.inputs.clair3_ref }}'
+          else
+            REF_INPUT='${{ github.event.inputs.nanomethphase_ref }}'
+          fi
+
+          if [[ -z "$REF_INPUT" ]]; then
+            REF_INPUT='${{ matrix.default_ref }}'
+          fi
+
+          REF_TAG=$(echo "$REF_INPUT" | tr '/:' '--')
+          BUILD_DATE=$(date -u +%Y%m%d)
+          echo "ref=$REF_INPUT" >> "$GITHUB_OUTPUT"
+          echo "ref_tag=$REF_TAG" >> "$GITHUB_OUTPUT"
+          echo "build_date=$BUILD_DATE" >> "$GITHUB_OUTPUT"
+
+      - name: Compose Docker tags
+        id: tags
+        shell: bash
+        run: |
+          IMAGE_BASE="${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_name }}"
+          TAGS="${IMAGE_BASE}:${{ steps.resolve.outputs.ref_tag }}"
+          TAGS+=$'\n'"${IMAGE_BASE}:${{ steps.resolve.outputs.ref_tag }}-${{ steps.resolve.outputs.build_date }}"
+          TAGS+=$'\n'"${IMAGE_BASE}:sha-${GITHUB_SHA}"
+
+          # Push :latest on scheduled runs and when explicitly enabled in manual runs.
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event.inputs.push_latest }}" == "true" ]]; then
+            TAGS+=$'\n'"${IMAGE_BASE}:latest"
+          fi
+
+          {
+            echo "tags<<EOF"
+            echo "$TAGS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: https://github.com/${{ matrix.repo }}.git#${{ steps.resolve.outputs.ref }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          provenance: false
+          sbom: false
