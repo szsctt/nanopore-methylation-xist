@@ -61,6 +61,27 @@ jobs:
           echo "ref_tag=$REF_TAG" >> "$GITHUB_OUTPUT"
           echo "build_date=$BUILD_DATE" >> "$GITHUB_OUTPUT"
 
+      - name: Check out upstream repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repo }}
+          ref: ${{ steps.resolve.outputs.ref }}
+          path: src
+          fetch-depth: 1
+
+      - name: Patch missing NanoMethPhase entrypoint
+        if: matrix.tool == 'nanomethphase'
+        shell: bash
+        run: |
+          if [[ ! -f src/entrypoint.sh ]]; then
+            cat > src/entrypoint.sh <<'EOS'
+            #!/usr/bin/env bash
+            set -euo pipefail
+            exec "$@"
+            EOS
+            chmod +x src/entrypoint.sh
+          fi
+
       - name: Compose Docker tags
         id: tags
         shell: bash
@@ -96,8 +117,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: https://github.com/${{ matrix.repo }}.git#${{ steps.resolve.outputs.ref }}
-          file: ${{ matrix.dockerfile }}
+          context: src
+          file: src/${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.tags.outputs.tags }}
           provenance: false
