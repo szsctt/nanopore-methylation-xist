@@ -75,10 +75,15 @@ rule stage_fastq:
         fastq=lambda wc: sample_field(wc, "fastq"),
     output:
         fastq="work/{sample}/{sample}.fastq.gz",
+    log:
+        "logs/{sample}/stage_fastq.log",
     shell:
         """
-        mkdir -p $(dirname {output.fastq})
-        ln -sf $(realpath {input.fastq}) {output.fastq}
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.fastq})
+          ln -sf $(realpath {input.fastq}) {output.fastq}
+        ) > {log} 2>&1
         """
 
 
@@ -87,23 +92,28 @@ rule download_reference:
         fasta=REFERENCE_FASTA,
     params:
         url=REFERENCE_URL,
+    log:
+        "logs/reference/download_reference.log",
     shell:
         """
-        mkdir -p $(dirname {output.fasta})
-        tmp=$(mktemp)
-        trap 'rm -f "$tmp"' EXIT
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.fasta})
+          tmp=$(mktemp)
+          trap 'rm -f "$tmp"' EXIT
 
-        if command -v curl >/dev/null 2>&1; then
-          curl -L --fail --retry 5 --retry-delay 10 -o "$tmp" {params.url}
-        else
-          wget -O "$tmp" {params.url}
-        fi
+          if command -v curl >/dev/null 2>&1; then
+            curl -L --fail --retry 5 --retry-delay 10 -o "$tmp" {params.url}
+          else
+            wget -O "$tmp" {params.url}
+          fi
 
-        if [[ "{params.url}" == *.gz ]]; then
-          gunzip -c "$tmp" > {output.fasta}
-        else
-          cp "$tmp" {output.fasta}
-        fi
+          if [[ "{params.url}" == *.gz ]]; then
+            gunzip -c "$tmp" > {output.fasta}
+          else
+            cp "$tmp" {output.fasta}
+          fi
+        ) > {log} 2>&1
         """
 
 
@@ -114,9 +124,14 @@ rule index_reference:
         fai=REFERENCE_FASTA + ".fai",
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/reference/index_reference.log",
     shell:
         """
-        samtools faidx {input.fasta}
+        mkdir -p $(dirname {log})
+        (
+          samtools faidx {input.fasta}
+        ) > {log} 2>&1
         """
 
 
@@ -132,10 +147,15 @@ rule align_minimap2:
     threads: THREADS["align"]
     container:
         CONTAINERS["minimap2"]
+    log:
+        "logs/{sample}/align_minimap2.log",
     shell:
         """
-        mkdir -p $(dirname {output.sam})
-        minimap2 -ax {params.preset} -t {threads} {input.ref} {input.fastq} > {output.sam}
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.sam})
+          minimap2 -ax {params.preset} -t {threads} {input.ref} {input.fastq} > {output.sam}
+        ) > {log} 2>&1
         """
 
 
@@ -147,10 +167,15 @@ rule sort_bam:
     threads: THREADS["samtools_sort"]
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/sort_bam.log",
     shell:
         """
-        mkdir -p $(dirname {output.bam})
-        samtools sort -@ {threads} -o {output.bam} {input.sam}
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.bam})
+          samtools sort -@ {threads} -o {output.bam} {input.sam}
+        ) > {log} 2>&1
         """
 
 
@@ -162,9 +187,14 @@ rule index_bam:
     threads: 4
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/index_bam.log",
     shell:
         """
-        samtools index -@ {threads} {input.bam} {output.bai}
+        mkdir -p $(dirname {log})
+        (
+          samtools index -@ {threads} {input.bam} {output.bai}
+        ) > {log} 2>&1
         """
 
 
@@ -175,14 +205,19 @@ rule download_clair3_model:
         url=config["clair3_model"]["source_url"],
     container:
         CONTAINERS["clair3"]
+    log:
+        "logs/reference/download_clair3_model.log",
     shell:
         """
-        mkdir -p $(dirname {output.archive})
-        if command -v curl >/dev/null 2>&1; then
-          curl -L --fail --retry 5 --retry-delay 10 -o {output.archive} {params.url}
-        else
-          wget -O {output.archive} {params.url}
-        fi
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.archive})
+          if command -v curl >/dev/null 2>&1; then
+            curl -L --fail --retry 5 --retry-delay 10 -o {output.archive} {params.url}
+          else
+            wget -O {output.archive} {params.url}
+          fi
+        ) > {log} 2>&1
         """
 
 
@@ -193,27 +228,32 @@ rule prepare_clair3_model:
         model_dir=directory(CLAIR3_MODEL_DIR),
     container:
         CONTAINERS["clair3"]
+    log:
+        "logs/reference/prepare_clair3_model.log",
     shell:
         """
-        tmpdir=$(mktemp -d)
-        trap 'rm -rf "$tmpdir"' EXIT
+        mkdir -p $(dirname {log})
+        (
+          tmpdir=$(mktemp -d)
+          trap 'rm -rf "$tmpdir"' EXIT
 
-        tar -xzf {input.archive} -C "$tmpdir"
-        model_candidate_file=$(find "$tmpdir" -type f \\( -name '*.pt' -o -name '*.index' -o -name 'pileup*' -o -name 'full_alignment*' \\) | head -n 1)
-        if [[ -n "$model_candidate_file" ]]; then
-          model_candidate=$(dirname "$model_candidate_file")
-        else
-          model_candidate=$(find "$tmpdir" -mindepth 1 -maxdepth 1 -type d | head -n 1)
-        fi
+          tar -xzf {input.archive} -C "$tmpdir"
+          model_candidate_file=$(find "$tmpdir" -type f \\( -name '*.pt' -o -name '*.index' -o -name 'pileup*' -o -name 'full_alignment*' \\) | head -n 1)
+          if [[ -n "$model_candidate_file" ]]; then
+            model_candidate=$(dirname "$model_candidate_file")
+          else
+            model_candidate=$(find "$tmpdir" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+          fi
 
-        if [[ -z "$model_candidate" ]]; then
-          echo "Could not locate Clair3 model contents in archive: {input.archive}" >&2
-          exit 1
-        fi
+          if [[ -z "$model_candidate" ]]; then
+            echo "Could not locate Clair3 model contents in archive: {input.archive}" >&2
+            exit 1
+          fi
 
-        rm -rf {output.model_dir}
-        mkdir -p {output.model_dir}
-        cp -a "$model_candidate"/. {output.model_dir}/
+          rm -rf {output.model_dir}
+          mkdir -p {output.model_dir}
+          cp -a "$model_candidate"/. {output.model_dir}/
+        ) > {log} 2>&1
         """
 
 
@@ -232,21 +272,26 @@ rule call_clair3:
     threads: THREADS["clair3"]
     container:
         CONTAINERS["clair3"]
+    log:
+        "logs/{sample}/call_clair3.log",
     shell:
         """
-        mkdir -p $(dirname {output.vcf})
-        rm -rf {params.outdir}
-        mkdir -p {params.outdir}
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.vcf})
+          rm -rf {params.outdir}
+          mkdir -p {params.outdir}
 
-        run_clair3.sh \
-          --bam_fn={input.bam} \
-          --ref_fn={input.ref} \
-          --output={params.outdir} \
-          --threads={threads} \
-          --platform={params.platform} \
-          --model_path={input.model}
+          run_clair3.sh \
+            --bam_fn={input.bam} \
+            --ref_fn={input.ref} \
+            --output={params.outdir} \
+            --threads={threads} \
+            --platform={params.platform} \
+            --model_path={input.model}
 
-        cp {params.outdir}/merge_output.vcf.gz {output.vcf}
+          cp {params.outdir}/merge_output.vcf.gz {output.vcf}
+        ) > {log} 2>&1
         """
 
 
@@ -257,9 +302,14 @@ rule index_called_vcf:
         tbi="results/{sample}/variants/{sample}.vcf.gz.tbi",
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/index_called_vcf.log",
     shell:
         """
-        tabix -f -p vcf {input.vcf}
+        mkdir -p $(dirname {log})
+        (
+          tabix -f -p vcf {input.vcf}
+        ) > {log} 2>&1
         """
 
 
@@ -273,15 +323,20 @@ rule filter_snps_for_phasing:
         min_q=config["snp_filter"]["min_q"],
     container:
         CONTAINERS["vcftools"]
+    log:
+        "logs/{sample}/filter_snps_for_phasing.log",
     shell:
         """
-        vcftools \
-          --gzvcf {input.vcf} \
-          --minQ {params.min_q} \
-          --recode \
-          --recode-INFO-all \
-          --stdout \
-        > {output.vcf}
+        mkdir -p $(dirname {log})
+        (
+          vcftools \
+            --gzvcf {input.vcf} \
+            --minQ {params.min_q} \
+            --recode \
+            --recode-INFO-all \
+            --stdout \
+          > {output.vcf}
+        ) > {log} 2>&1
         """
 
 
@@ -297,13 +352,18 @@ rule phase_variants_whatshap:
     threads: THREADS["whatshap"]
     container:
         CONTAINERS["whatshap"]
+    log:
+        "logs/{sample}/phase_variants_whatshap.log",
     shell:
         """
-        whatshap phase \
-          --ignore-read-groups \
-          --reference {input.ref} \
-          --output {output.vcf} \
-          {input.vcf} {input.bam}
+        mkdir -p $(dirname {log})
+        (
+          whatshap phase \
+            --ignore-read-groups \
+            --reference {input.ref} \
+            --output {output.vcf} \
+            {input.vcf} {input.bam}
+        ) > {log} 2>&1
         """
 
 
@@ -314,9 +374,14 @@ rule bgzip_phase_vcf:
         vcf="results/{sample}/variants/{sample}.phased.vcf.gz",
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/bgzip_phase_vcf.log",
     shell:
         """
-        bgzip -c {input.vcf} > {output.vcf}
+        mkdir -p $(dirname {log})
+        (
+          bgzip -c {input.vcf} > {output.vcf}
+        ) > {log} 2>&1
         """
 
 
@@ -327,9 +392,14 @@ rule index_phase_vcf:
         tbi="results/{sample}/variants/{sample}.phased.vcf.gz.tbi",
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/index_phase_vcf.log",
     shell:
         """
-        tabix -f -p vcf {input.vcf}
+        mkdir -p $(dirname {log})
+        (
+          tabix -f -p vcf {input.vcf}
+        ) > {log} 2>&1
         """
 
 
@@ -346,18 +416,23 @@ rule xist_filter_vcf:
         min_q=config["snp_filter"]["min_q"],
     container:
         CONTAINERS["vcftools"]
+    log:
+        "logs/{sample}/xist_filter_vcf.log",
     shell:
         """
-        vcftools \
-          --gzvcf {input.vcf} \
-          --chr {params.chrom} \
-          --from-bp {params.start} \
-          --to-bp {params.end} \
-          --minQ {params.min_q} \
-          --recode \
-          --recode-INFO-all \
-          --stdout \
-        > {output.vcf}
+        mkdir -p $(dirname {log})
+        (
+          vcftools \
+            --gzvcf {input.vcf} \
+            --chr {params.chrom} \
+            --from-bp {params.start} \
+            --to-bp {params.end} \
+            --minQ {params.min_q} \
+            --recode \
+            --recode-INFO-all \
+            --stdout \
+          > {output.vcf}
+        ) > {log} 2>&1
         """
 
 
@@ -368,9 +443,14 @@ rule bgzip_xist_vcf:
         vcf="results/{sample}/variants/{sample}.XIST.filt.vcf.gz",
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/bgzip_xist_vcf.log",
     shell:
         """
-        bgzip -c {input.vcf} > {output.vcf}
+        mkdir -p $(dirname {log})
+        (
+          bgzip -c {input.vcf} > {output.vcf}
+        ) > {log} 2>&1
         """
 
 
@@ -381,9 +461,14 @@ rule index_xist_vcf:
         tbi="results/{sample}/variants/{sample}.XIST.filt.vcf.gz.tbi",
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/index_xist_vcf.log",
     shell:
         """
-        tabix -f -p vcf {input.vcf}
+        mkdir -p $(dirname {log})
+        (
+          tabix -f -p vcf {input.vcf}
+        ) > {log} 2>&1
         """
 
 
@@ -394,9 +479,14 @@ rule summarize_called_vcf:
         script="workflow/scripts/summarize_vcf_metrics.py",
     output:
         summary="results/{sample}/qc/{sample}.vcf.summary.tsv",
+    log:
+        "logs/{sample}/summarize_called_vcf.log",
     shell:
         """
-        python {input.script} --vcf {input.vcf} --out-summary {output.summary}
+        mkdir -p $(dirname {log})
+        (
+          python {input.script} --vcf {input.vcf} --out-summary {output.summary}
+        ) > {log} 2>&1
         """
 
 
@@ -407,9 +497,14 @@ rule summarize_phased_vcf:
         script="workflow/scripts/summarize_vcf_metrics.py",
     output:
         summary="results/{sample}/qc/{sample}.phased.vcf.summary.tsv",
+    log:
+        "logs/{sample}/summarize_phased_vcf.log",
     shell:
         """
-        python {input.script} --vcf {input.vcf} --out-summary {output.summary}
+        mkdir -p $(dirname {log})
+        (
+          python {input.script} --vcf {input.vcf} --out-summary {output.summary}
+        ) > {log} 2>&1
         """
 
 
@@ -420,9 +515,14 @@ rule summarize_xist_filtered_vcf:
         script="workflow/scripts/summarize_vcf_metrics.py",
     output:
         summary="results/{sample}/qc/{sample}.XIST.filt.vcf.summary.tsv",
+    log:
+        "logs/{sample}/summarize_xist_filtered_vcf.log",
     shell:
         """
-        python {input.script} --vcf {input.vcf} --out-summary {output.summary}
+        mkdir -p $(dirname {log})
+        (
+          python {input.script} --vcf {input.vcf} --out-summary {output.summary}
+        ) > {log} 2>&1
         """
 
 
@@ -436,16 +536,21 @@ rule nanopolish_index:
         sequencing_summary=lambda wc: sample_field(wc, "sequencing_summary"),
     container:
         CONTAINERS["nanopolish"]
+    log:
+        "logs/{sample}/nanopolish_index.log",
     shell:
         """
-        mkdir -p $(dirname {output.done})
-        SEQ_SUMMARY_OPT=""
-        if [[ -n "{params.sequencing_summary}" && -f "{params.sequencing_summary}" ]]; then
-          SEQ_SUMMARY_OPT="-s {params.sequencing_summary}"
-        fi
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.done})
+          SEQ_SUMMARY_OPT=""
+          if [[ -n "{params.sequencing_summary}" && -f "{params.sequencing_summary}" ]]; then
+            SEQ_SUMMARY_OPT="-s {params.sequencing_summary}"
+          fi
 
-        nanopolish index -d {params.fast5_dir} $SEQ_SUMMARY_OPT {input.fastq}
-        touch {output.done}
+          nanopolish index -d {params.fast5_dir} $SEQ_SUMMARY_OPT {input.fastq}
+          touch {output.done}
+        ) > {log} 2>&1
         """
 
 
@@ -462,16 +567,21 @@ rule nanopolish_call_methylation:
     threads: THREADS["nanopolish"]
     container:
         CONTAINERS["nanopolish"]
+    log:
+        "logs/{sample}/nanopolish_call_methylation.log",
     shell:
         """
-        mkdir -p $(dirname {output.tsv})
-        nanopolish call-methylation \
-          -t {threads} \
-          -q cpg \
-          -r {input.fastq} \
-          -b {input.bam} \
-          -g {input.ref} \
-        > {output.tsv}
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.tsv})
+          nanopolish call-methylation \
+            -t {threads} \
+            -q cpg \
+            -r {input.fastq} \
+            -b {input.bam} \
+            -g {input.ref} \
+          > {output.tsv}
+        ) > {log} 2>&1
         """
 
 
@@ -484,16 +594,21 @@ rule methyl_call_processor:
     threads: THREADS["methyl_call_processor"]
     container:
         CONTAINERS["nanomethphase"]
+    log:
+        "logs/{sample}/methyl_call_processor.log",
     shell:
         """
-        mkdir -p $(dirname {output.bed})
-        python nanomethphase.py methyl_call_processor \
-          -mc {input.calls} \
-          -t {threads} \
-        | sort -k1,1 -k2,2n -k3,3n \
-        | bgzip -c > {output.bed}
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.bed})
+          python nanomethphase.py methyl_call_processor \
+            -mc {input.calls} \
+            -t {threads} \
+          | sort -k1,1 -k2,2n -k3,3n \
+          | bgzip -c > {output.bed}
 
-        tabix -f -p bed {output.bed}
+          tabix -f -p bed {output.bed}
+        ) > {log} 2>&1
         """
 
 
@@ -516,21 +631,26 @@ rule nanomethphase_phase:
     threads: THREADS["nanomethphase_phase"]
     container:
         CONTAINERS["nanomethphase"]
+    log:
+        "logs/{sample}/nanomethphase_phase.log",
     shell:
         """
-        mkdir -p $(dirname {output.hp1})
-        python nanomethphase.py phase \
-          -b {input.bam} \
-          -v {input.vcf} \
-          -mc {input.meth_bed} \
-          -r {input.ref} \
-          -o {params.prefix} \
-          -of methylcall \
-          -t {threads}
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.hp1})
+          python nanomethphase.py phase \
+            -b {input.bam} \
+            -v {input.vcf} \
+            -mc {input.meth_bed} \
+            -r {input.ref} \
+            -o {params.prefix} \
+            -of methylcall \
+            -t {threads}
 
-        test -s {output.hp1}
-        test -s {output.hp2}
-        test -s {output.gtf}
+          test -s {output.hp1}
+          test -s {output.hp2}
+          test -s {output.gtf}
+        ) > {log} 2>&1
         """
 
 
@@ -541,9 +661,14 @@ rule bgzip_gtf:
         gtf="results/{sample}/nanomethphase/{sample}.gtf.gz",
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/bgzip_gtf.log",
     shell:
         """
-        bgzip -c {input.gtf} > {output.gtf}
+        mkdir -p $(dirname {log})
+        (
+          bgzip -c {input.gtf} > {output.gtf}
+        ) > {log} 2>&1
         """
 
 
@@ -554,9 +679,14 @@ rule methylfreq_to_bedgraph:
         bedgraph="results/{sample}/nanomethphase/{sample}_NanoMethPhase_{hap}_MethylFrequency.bedgraph.gz",
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/methylfreq_to_bedgraph_{hap}.log",
     shell:
         """
-        awk 'BEGIN{{FS=OFS="\t"}} NR>1 {{print $1,$2,$3,$7}}' {input.tsv} | bgzip -c > {output.bedgraph}
+        mkdir -p $(dirname {log})
+        (
+          awk 'BEGIN{{FS=OFS="\t"}} NR>1 {{print $1,$2,$3,$7}}' {input.tsv} | bgzip -c > {output.bedgraph}
+        ) > {log} 2>&1
         """
 
 
@@ -569,10 +699,15 @@ rule subset_xist_methylfreq:
         chrom=XIST["chrom"],
         start=XIST["start"],
         end=XIST["end"],
+    log:
+        "logs/{sample}/subset_xist_methylfreq_{hap}.log",
     shell:
         """
-        mkdir -p $(dirname {output.tsv})
-        awk -v chrom={params.chrom} -v start={params.start} -v end={params.end} 'BEGIN{{FS=OFS="\t"}} NR==1 {{print; next}} $1==chrom && $2>=start && $3<=end {{print}}' {input.tsv} > {output.tsv}
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p $(dirname {output.tsv})
+          awk -v chrom={params.chrom} -v start={params.start} -v end={params.end} 'BEGIN{{FS=OFS="\t"}} NR==1 {{print; next}} $1==chrom && $2>=start && $3<=end {{print}}' {input.tsv} > {output.tsv}
+        ) > {log} 2>&1
         """
 
 
@@ -590,18 +725,23 @@ rule nanomethphase_dma:
     threads: THREADS["dma"]
     container:
         CONTAINERS["nanomethphase"]
+    log:
+        "logs/{sample}/nanomethphase_dma.log",
     shell:
         """
-        mkdir -p {params.outdir}
-        python nanomethphase.py dma \
-          -c {params.columns} \
-          -ca {input.hp1} \
-          -co {input.hp2} \
-          -o {params.outdir} \
-          -op {params.prefix}
+        mkdir -p $(dirname {log})
+        (
+          mkdir -p {params.outdir}
+          python nanomethphase.py dma \
+            -c {params.columns} \
+            -ca {input.hp1} \
+            -co {input.hp2} \
+            -o {params.outdir} \
+            -op {params.prefix}
 
-        test -s {output.dml}
-        test -s {output.dmr}
+          test -s {output.dml}
+          test -s {output.dmr}
+        ) > {log} 2>&1
         """
 
 
@@ -612,9 +752,14 @@ rule bgzip_dmltest:
         dml="results/{sample}/dma/{sample}_XIST_DMLtest.txt.gz",
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/bgzip_dmltest.log",
     shell:
         """
-        bgzip -c {input.dml} > {output.dml}
+        mkdir -p $(dirname {log})
+        (
+          bgzip -c {input.dml} > {output.dml}
+        ) > {log} 2>&1
         """
 
 
@@ -625,7 +770,12 @@ rule bgzip_calldmr:
         dmr="results/{sample}/dma/{sample}_XIST_callDMR.txt.gz",
     container:
         CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/bgzip_calldmr.log",
     shell:
         """
-        bgzip -c {input.dmr} > {output.dmr}
+        mkdir -p $(dirname {log})
+        (
+          bgzip -c {input.dmr} > {output.dmr}
+        ) > {log} 2>&1
         """

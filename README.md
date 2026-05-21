@@ -31,6 +31,30 @@ snakemake --use-singularity --cores 24
 
 For cluster/HPC execution, add your profile/executor flags as usual.
 
+Each rule now writes stdout/stderr logs under `logs/` (for example, `logs/OTC3/nanopolish_index.log`).
+
+## Build custom images (Clair3 + NanoMethPhase)
+
+Because `quay.io/biocontainers` images are not available for `clair3` and `nanomethphase`, this repo includes a GitHub Actions workflow:
+
+- `.github/workflows/build-custom-tool-images.yml`
+
+It builds from upstream Dockerfiles and pushes to Docker Hub:
+
+- `HKU-BAL/Clair3` (`Dockerfile` at repo root)
+- `vahidAK/NanoMethPhase` (`Dockerfile` at repo root)
+
+Set these GitHub repository secrets:
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_PASSWORD` (Docker Hub access token or password)
+
+Then run workflow **Build Custom Clair3 and NanoMethPhase Images** via **Actions > Run workflow**.
+After the first successful push, set your Docker Hub namespace in `config/config.yaml`:
+
+- `containers.clair3`
+- `containers.nanomethphase`
+
 ## Main outputs
 
 Per sample (`results/OTC3/`):

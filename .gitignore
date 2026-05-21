@@ -1,0 +1,6 @@
+.snakemake
+analysis
+data
+previous_results
+resources
+logs
