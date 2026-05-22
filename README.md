@@ -39,10 +39,15 @@ Because `quay.io/biocontainers` images are not available for `clair3` and `nanom
 
 - `.github/workflows/build-custom-tool-images.yml`
 
-It builds from upstream Dockerfiles and pushes to Docker Hub:
+It builds and pushes to Docker Hub:
 
-- `HKU-BAL/Clair3` (`Dockerfile` at repo root)
-- `vahidAK/NanoMethPhase` (`Dockerfile` at repo root)
+- `clair3`: upstream `HKU-BAL/Clair3` Dockerfile
+- `nanomethphase`: local custom multi-stage Dockerfile at `docker/nanomethphase.Dockerfile`
+
+The custom NanoMethPhase image keeps compile dependencies in a build stage and ships a smaller runtime stage with:
+- `nanomethphase` + `whatshap` (Python venv)
+- `samtools` / `tabix`
+- R + Bioconductor `DSS` (for `dma`)
 
 Set these GitHub repository secrets:
 
