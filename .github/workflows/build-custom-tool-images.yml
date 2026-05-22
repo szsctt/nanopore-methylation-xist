@@ -30,17 +30,24 @@ jobs:
       matrix:
         include:
           - tool: clair3
-            repo: HKU-BAL/Clair3
+            upstream_repo: HKU-BAL/Clair3
             default_ref: main
-            dockerfile: Dockerfile
+            build_context: src
+            dockerfile: src/Dockerfile
             image_name: clair3
+            build_arg_name: ""
           - tool: nanomethphase
-            repo: vahidAK/NanoMethPhase
+            upstream_repo: ""
             default_ref: master
-            dockerfile: Dockerfile
+            build_context: .
+            dockerfile: docker/nanomethphase.Dockerfile
             image_name: nanomethphase
+            build_arg_name: NANOMETHPHASE_REF
 
     steps:
+      - name: Check out workflow repository
+        uses: actions/checkout@v4
+
       - name: Resolve upstream ref
         id: resolve
         shell: bash
@@ -62,21 +69,13 @@ jobs:
           echo "build_date=$BUILD_DATE" >> "$GITHUB_OUTPUT"
 
       - name: Check out upstream repository
+        if: matrix.upstream_repo != ''
         uses: actions/checkout@v4
         with:
-          repository: ${{ matrix.repo }}
+          repository: ${{ matrix.upstream_repo }}
           ref: ${{ steps.resolve.outputs.ref }}
           path: src
           fetch-depth: 1
-
-      - name: Patch missing NanoMethPhase entrypoint
-        if: matrix.tool == 'nanomethphase'
-        shell: bash
-        run: |
-          if [[ ! -f src/entrypoint.sh ]]; then
-            printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec "$@"' > src/entrypoint.sh
-            chmod +x src/entrypoint.sh
-          fi
 
       - name: Compose Docker tags
         id: tags
@@ -87,7 +86,6 @@ jobs:
           TAGS+=$'\n'"${IMAGE_BASE}:${{ steps.resolve.outputs.ref_tag }}-${{ steps.resolve.outputs.build_date }}"
           TAGS+=$'\n'"${IMAGE_BASE}:sha-${GITHUB_SHA}"
 
-          # Push :latest on scheduled runs and when explicitly enabled in manual runs.
           if [[ "${{ github.event_name }}" == "schedule" || "${{ github.event.inputs.push_latest }}" == "true" ]]; then
             TAGS+=$'\n'"${IMAGE_BASE}:latest"
           fi
@@ -97,6 +95,23 @@ jobs:
             echo "$TAGS"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Compose build args
+        id: buildargs
+        shell: bash
+        run: |
+          if [[ -n "${{ matrix.build_arg_name }}" ]]; then
+            {
+              echo "build_args<<EOF"
+              echo "${{ matrix.build_arg_name }}=${{ steps.resolve.outputs.ref }}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "build_args<<EOF"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -113,9 +128,10 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: src
-          file: src/${{ matrix.dockerfile }}
+          context: ${{ matrix.build_context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.tags.outputs.tags }}
+          build-args: ${{ steps.buildargs.outputs.build_args }}
           provenance: false
           sbom: false
