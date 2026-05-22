@@ -1,7 +1,7 @@
 # Custom multi-stage image for NanoMethPhase runtime.
 # Build dependencies stay in builder stage.
 
-FROM ubuntu:22.04 AS builder
+FROM ubuntu:20.04 AS builder
 ARG DEBIAN_FRONTEND=noninteractive
 ARG NANOMETHPHASE_REF=master
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -24,7 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --upgrade "pip<24" "setuptools<60" "wheel<0.38"
+RUN pip install --no-cache-dir "numpy==1.18.5"
 RUN pip install --no-cache-dir \
     "git+https://github.com/vahidAK/NanoMethPhase.git@${NANOMETHPHASE_REF}" \
     whatshap
@@ -37,7 +38,7 @@ RUN if [[ -x /opt/venv/bin/nanomethphase.py ]]; then \
     fi
 
 
-FROM ubuntu:22.04
+FROM ubuntu:20.04
 ARG DEBIAN_FRONTEND=noninteractive
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 

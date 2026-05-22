@@ -125,6 +125,21 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
+      - name: Debug build inputs
+        shell: bash
+        run: |
+          echo "tool=${{ matrix.tool }}"
+          echo "build_context=${{ matrix.build_context }}"
+          echo "dockerfile=${{ matrix.dockerfile }}"
+          if [[ -f "${{ matrix.dockerfile }}" ]]; then
+            echo "dockerfile exists: yes"
+            sed -n '1,60p' "${{ matrix.dockerfile }}"
+          else
+            echo "dockerfile exists: no"
+            ls -la
+            exit 1
+          fi
+
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
