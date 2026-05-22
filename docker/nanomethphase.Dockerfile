@@ -30,13 +30,6 @@ RUN pip install --no-cache-dir \
     "git+https://github.com/vahidAK/NanoMethPhase.git@${NANOMETHPHASE_REF}" \
     whatshap
 
-# Some installs expose nanomethphase.py, others expose nanomethphase.
-RUN if [[ -x /opt/venv/bin/nanomethphase.py ]]; then \
-      true; \
-    elif [[ -x /opt/venv/bin/nanomethphase ]]; then \
-      ln -s /opt/venv/bin/nanomethphase /opt/venv/bin/nanomethphase.py; \
-    fi
-
 
 FROM ubuntu:20.04
 ARG DEBIAN_FRONTEND=noninteractive
@@ -62,10 +55,8 @@ ENV PATH="/opt/venv/bin:${PATH}"
 RUN Rscript -e "install.packages('BiocManager', repos='https://cloud.r-project.org')" \
  && Rscript -e "BiocManager::install('DSS', ask=FALSE, update=FALSE)"
 
-RUN if [[ -x /opt/venv/bin/nanomethphase.py ]]; then \
-      ln -sf /opt/venv/bin/nanomethphase.py /usr/local/bin/nanomethphase.py; \
-    elif [[ -x /opt/venv/bin/nanomethphase ]]; then \
-      ln -sf /opt/venv/bin/nanomethphase /usr/local/bin/nanomethphase.py; \
-    fi
+RUN printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec /opt/venv/bin/python3 -m nanomethphase "$@"' > /usr/local/bin/nanomethphase \
+ && chmod +x /usr/local/bin/nanomethphase \
+ && ln -sf /usr/local/bin/nanomethphase /usr/local/bin/nanomethphase.py
 
 CMD ["/bin/bash"]

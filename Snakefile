@@ -601,7 +601,7 @@ rule methyl_call_processor:
         mkdir -p $(dirname {log})
         (
           mkdir -p $(dirname {output.bed})
-          python nanomethphase.py methyl_call_processor \
+          python3 -m nanomethphase methyl_call_processor \
             -mc {input.calls} \
             -t {threads} \
           | sort -k1,1 -k2,2n -k3,3n \
@@ -638,7 +638,7 @@ rule nanomethphase_phase:
         mkdir -p $(dirname {log})
         (
           mkdir -p $(dirname {output.hp1})
-          python nanomethphase.py phase \
+          python3 -m nanomethphase phase \
             -b {input.bam} \
             -v {input.vcf} \
             -mc {input.meth_bed} \
@@ -732,7 +732,7 @@ rule nanomethphase_dma:
         mkdir -p $(dirname {log})
         (
           mkdir -p {params.outdir}
-          python nanomethphase.py dma \
+          python3 -m nanomethphase dma \
             -c {params.columns} \
             -ca {input.hp1} \
             -co {input.hp2} \
