@@ -1,6 +1,6 @@
-# OTC3 Nanopore Allele-Specific Methylation Workflow (Snakemake)
+# Nanopore Allele-Specific Methylation Workflow 
 
-This workflow reproduces the published-style analysis for sample `OTC3` using:
+This workflow performs methylation analysis for sample `OTC3` using:
 - `minimap2` for ONT alignment
 - `clair3` for SNP calling
 - `vcftools` for VCF filtering/subsetting
@@ -8,7 +8,7 @@ This workflow reproduces the published-style analysis for sample `OTC3` using:
 - `nanopolish` for per-read methylation calling
 - `nanomethphase` for haplotype methylation phasing and DSS-based DMA
 
-All tools are configured to run through Singularity images from `quay.io/biocontainers`.
+All tools are configured to run through Singularity images.
 
 ## Expected inputs
 
@@ -18,7 +18,7 @@ Required:
 - FASTQ (merged ONT reads) per sample
 - FAST5 directory per sample
 
-Optional but recommended:
+Optional:
 - `sequencing_summary.txt` for nanopolish indexing
 
 Reference is downloaded automatically from `reference_url` into `reference_fasta` and indexed with `samtools faidx`.
@@ -31,7 +31,9 @@ snakemake --use-singularity --cores 24
 
 For cluster/HPC execution, add your profile/executor flags as usual.
 
-Each rule now writes stdout/stderr logs under `logs/` (for example, `logs/OTC3/nanopolish_index.log`).
+Output is under `results/`.
+
+Stdout/stderr logs are written under `logs/` (for example, `logs/OTC3/nanopolish_index.log`).
 
 ## Build custom images (Clair3 + NanoMethPhase)
 
@@ -74,8 +76,7 @@ Per sample (`results/OTC3/`):
 
 ## Notes on defaults
 
-- XIST region defaults are set from `previous_results`:
-  - `chrX:73813879-73862026`
+- XIST region default is `chrX:73813879-73862026`
 - SNP filtering currently applies only minimum QUAL (`snp_filter.min_q`).
 - Clair3 models are automatically downloaded/extracted to `resources/models/clair3/` from `clair3_model.source_url`.
 - Current defaults pair `clair3:0.1-r12` with a legacy TensorFlow model (`clair3_models/` URL family).
