@@ -16,18 +16,21 @@ xist_region:
 # SNP filtering prior to phasing and for the XIST subset
 # Defaults inferred from previous_results and can be tuned.
 snp_filter:
-  min_q: 800
+  min_q: 750
 
-# Clair3 settings
-clair3:
-  platform: "ont"
+# Clair2 settings (biocontainers/clair:2.1.1)
+clair:
+  threshold: 0.125
+  min_coverage: 4
+  # Optional extra args passed to callVarBam, e.g. "--qual=2".
+  # Keep optional args in --key=value form.
+  extra_args: ""
 
-# Clair3 model download (auto-fetched by workflow)
-# This workflow currently uses Clair3 container 0.1-r12 (TensorFlow era),
-# so use models from clair3_models/ (not clair3_models_pytorch/).
-clair3_model:
-  name: "r941_prom_hac_g360+g422"
-  source_url: "http://www.bio8.cs.hku.hk/clair3/clair3_models/r941_prom_hac_g360+g422.tar.gz"
+# Clair2 ONT model download (auto-fetched by workflow).
+# Files contain model.data-00000-of-00001, model.index, model.meta.
+clair_model:
+  name: "ont_122HD34"
+  source_url: "http://www.bio8.cs.hku.hk/clair_models/ont/122HD34.tar"
 
 # NanoMethPhase DMA settings
 # Column mapping for methylation-frequency files
@@ -38,7 +41,7 @@ dma:
 threads:
   align: 16
   samtools_sort: 16
-  clair3: 24
+  clair: 24
   whatshap: 12
   nanopolish: 24
   methyl_call_processor: 12
@@ -53,7 +56,5 @@ containers:
   vcftools: "docker://quay.io/biocontainers/vcftools:0.1.17--pl5321h077b44d_0"
   whatshap: "docker://quay.io/biocontainers/whatshap:2.8--py312hf731ba3_0"
   nanopolish: "docker://quay.io/biocontainers/nanopolish:0.14.0--h5ca1c30_6"
-  # Built via .github/workflows/build-custom-tool-images.yml
-  # Replace YOUR_DOCKERHUB_USERNAME with your Docker Hub namespace.
-  clair3: "docker://docker.io/YOUR_DOCKERHUB_USERNAME/clair3:latest"
-  nanomethphase: "docker://docker.io/YOUR_DOCKERHUB_USERNAME/nanomethphase:latest"
+  clair: "docker://quay.io/biocontainers/clair:2.1.1--0"
+  nanomethphase: "docker://docker.io/szsctt/nanomethphase:latest"

@@ -4,3 +4,7 @@ data
 previous_results
 resources
 logs
+results
+work
+.parallel
+**cypython

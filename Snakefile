@@ -36,9 +36,9 @@ THREADS = config["threads"]
 CONTAINERS = config["containers"]
 REFERENCE_FASTA = config["reference_fasta"]
 REFERENCE_URL = config["reference_url"]
-CLAIR3_MODEL_NAME = config["clair3_model"]["name"]
-CLAIR3_MODEL_ARCHIVE = f"resources/models/clair3/{CLAIR3_MODEL_NAME}.tar.gz"
-CLAIR3_MODEL_DIR = f"resources/models/clair3/{CLAIR3_MODEL_NAME}"
+CLAIR_MODEL_NAME = config["clair_model"]["name"]
+CLAIR_MODEL_ARCHIVE = f"resources/models/clair/{CLAIR_MODEL_NAME}.tar"
+CLAIR_MODEL_DIR = f"resources/models/clair/{CLAIR_MODEL_NAME}"
 
 
 def sample_field(wildcards, field, default=""):
@@ -198,38 +198,46 @@ rule index_bam:
         """
 
 
-rule download_clair3_model:
+rule download_clair_model:
     output:
-        archive=CLAIR3_MODEL_ARCHIVE,
+        archive=CLAIR_MODEL_ARCHIVE,
     params:
-        url=config["clair3_model"]["source_url"],
-    container:
-        CONTAINERS["clair3"]
+        url=config["clair_model"]["source_url"],
     log:
-        "logs/reference/download_clair3_model.log",
+        "logs/reference/download_clair_model.log",
     shell:
         """
         mkdir -p $(dirname {log})
         (
           mkdir -p $(dirname {output.archive})
-          if command -v curl >/dev/null 2>&1; then
-            curl -L --fail --retry 5 --retry-delay 10 -o {output.archive} {params.url}
+          model_url="{params.url}"
+          if [[ -z "$model_url" ]]; then
+            echo "Missing clair_model.source_url in config/config.yaml" >&2
+            exit 1
+          fi
+
+          if [[ -f "$model_url" ]]; then
+            cp "$model_url" {output.archive}
+          elif [[ "$model_url" == file://* ]]; then
+            cp "${{model_url#file://}}" {output.archive}
+          elif command -v curl >/dev/null 2>&1; then
+            curl -L --fail --retry 5 --retry-delay 10 -o {output.archive} "$model_url"
           else
-            wget -O {output.archive} {params.url}
+            wget -O {output.archive} "$model_url"
           fi
         ) > {log} 2>&1
         """
 
 
-rule prepare_clair3_model:
+rule prepare_clair_model:
     input:
-        archive=rules.download_clair3_model.output.archive,
+        archive=rules.download_clair_model.output.archive,
     output:
-        model_dir=directory(CLAIR3_MODEL_DIR),
+        model_dir=directory(CLAIR_MODEL_DIR),
     container:
-        CONTAINERS["clair3"]
+        CONTAINERS["clair"]
     log:
-        "logs/reference/prepare_clair3_model.log",
+        "logs/reference/prepare_clair_model.log",
     shell:
         """
         mkdir -p $(dirname {log})
@@ -237,43 +245,49 @@ rule prepare_clair3_model:
           tmpdir=$(mktemp -d)
           trap 'rm -rf "$tmpdir"' EXIT
 
-          tar -xzf {input.archive} -C "$tmpdir"
-          model_candidate_file=$(find "$tmpdir" -type f \\( -name '*.pt' -o -name '*.index' -o -name 'pileup*' -o -name 'full_alignment*' \\) | head -n 1)
-          if [[ -n "$model_candidate_file" ]]; then
-            model_candidate=$(dirname "$model_candidate_file")
-          else
-            model_candidate=$(find "$tmpdir" -mindepth 1 -maxdepth 1 -type d | head -n 1)
-          fi
+          tar -xf {input.archive} -C "$tmpdir"
+          model_index=$(find "$tmpdir" -type f -name "model.index" | head -n 1 || true)
 
-          if [[ -z "$model_candidate" ]]; then
-            echo "Could not locate Clair3 model contents in archive: {input.archive}" >&2
+          if [[ -z "$model_index" ]]; then
+            echo "Could not locate model.index in archive: {input.archive}" >&2
+            find "$tmpdir" -maxdepth 3 -type f >&2 || true
             exit 1
           fi
 
+          model_candidate=$(dirname "$model_index")
           rm -rf {output.model_dir}
           mkdir -p {output.model_dir}
           cp -a "$model_candidate"/. {output.model_dir}/
+
+          if [[ ! -f {output.model_dir}/model.index ]]; then
+            echo "Prepared Clair model is missing model.index at {output.model_dir}" >&2
+            exit 1
+          fi
         ) > {log} 2>&1
         """
 
 
-rule call_clair3:
+rule call_clair:
     input:
         bam=rules.sort_bam.output.bam,
         bai=rules.index_bam.output.bai,
         ref=rules.download_reference.output.fasta,
         fai=rules.index_reference.output.fai,
-        model=rules.prepare_clair3_model.output.model_dir,
+        model=rules.prepare_clair_model.output.model_dir,
     output:
         vcf="results/{sample}/variants/{sample}.vcf.gz",
     params:
-        outdir=lambda wc: f"work/{wc.sample}/clair3",
-        platform=config["clair3"]["platform"],
-    threads: THREADS["clair3"]
+        outdir=lambda wc: f"work/{wc.sample}/clair",
+        raw_vcf=lambda wc: f"work/{wc.sample}/clair/{wc.sample}.vcf",
+        ctg=XIST["chrom"],
+        threshold=config["clair"].get("threshold", 0.125),
+        min_coverage=config["clair"].get("min_coverage", 4),
+        extra_args=config["clair"].get("extra_args", ""),
+    threads: THREADS["clair"]
     container:
-        CONTAINERS["clair3"]
+        CONTAINERS["clair"]
     log:
-        "logs/{sample}/call_clair3.log",
+        "logs/{sample}/call_clair.log",
     shell:
         """
         mkdir -p $(dirname {log})
@@ -282,22 +296,72 @@ rule call_clair3:
           rm -rf {params.outdir}
           mkdir -p {params.outdir}
 
-          run_clair3.sh \
-            --bam_fn={input.bam} \
-            --ref_fn={input.ref} \
-            --output={params.outdir} \
-            --threads={threads} \
-            --platform={params.platform} \
-            --model_path={input.model}
+          clair_bin=$(command -v clair.py || true)
+          python_bin=$(command -v python3 || command -v python || true)
+          samtools_bin=$(command -v samtools || true)
+          pypy_bin=$(command -v pypy3 || command -v pypy || command -v python3 || command -v python || true)
 
-          cp {params.outdir}/merge_output.vcf.gz {output.vcf}
+          if [[ -z "$clair_bin" || -z "$python_bin" || -z "$samtools_bin" || -z "$pypy_bin" ]]; then
+            echo "Missing required binary in Clair container." >&2
+            echo "clair_bin=$clair_bin" >&2
+            echo "python_bin=$python_bin" >&2
+            echo "samtools_bin=$samtools_bin" >&2
+            echo "pypy_bin=$pypy_bin" >&2
+            exit 1
+          fi
+
+          # Some Clair2 images include pypy without intervaltree.
+          # Try exposing Python3 site-packages to pypy first (no downloads).
+          # Fall back to python for pypy-subtasks only if still unavailable.
+          if ! "$pypy_bin" -c 'import intervaltree' >/dev/null 2>&1; then
+            echo "[INFO] pypy missing intervaltree; trying PYTHONPATH bridge." >&2
+            pypy_py_path=""
+            for site_dir in /opt/conda/envs/*/lib/python*/site-packages /usr/local/lib/python*/site-packages /opt/conda/lib/python*/site-packages /usr/lib/python*/site-packages; do
+              if [[ -d "$site_dir" ]] && PYTHONPATH="$site_dir${{PYTHONPATH:+:$PYTHONPATH}}" "$pypy_bin" -c 'import intervaltree' >/dev/null 2>&1; then
+                pypy_py_path="$site_dir"
+                break
+              fi
+            done
+
+            if [[ -n "$pypy_py_path" ]]; then
+              export PYTHONPATH="$pypy_py_path${{PYTHONPATH:+:$PYTHONPATH}}"
+              echo "[INFO] using pypy via PYTHONPATH bridge: $pypy_py_path" >&2
+            else
+              pypy_bin="$python_bin"
+              echo "[WARNING] pypy intervaltree unavailable; falling back to python for --pypy." >&2
+            fi
+          else
+            echo "[INFO] pypy intervaltree import OK with default environment." >&2
+          fi
+          echo "[INFO] --pypy binary set to: $pypy_bin" >&2
+
+          "$python_bin" "$clair_bin" callVarBam \
+            --chkpnt_fn {input.model}/model \
+            --ref_fn {input.ref} \
+            --bam_fn {input.bam} \
+            --call_fn {params.raw_vcf} \
+            --ctgName {params.ctg} \
+            --sampleName {wildcards.sample} \
+            --threads {threads} \
+            --threshold={params.threshold} \
+            --minCoverage={params.min_coverage} \
+            --samtools "$samtools_bin" \
+            --pypy "$pypy_bin" {params.extra_args}
+
+          if [[ ! -s {params.raw_vcf} ]]; then
+            echo "Expected Clair output VCF missing: {params.raw_vcf}" >&2
+            find {params.outdir} -maxdepth 3 -type f >&2 || true
+            exit 1
+          fi
+
+          bgzip -f -c {params.raw_vcf} > {output.vcf}
         ) > {log} 2>&1
         """
 
 
 rule index_called_vcf:
     input:
-        vcf=rules.call_clair3.output.vcf,
+        vcf=rules.call_clair.output.vcf,
     output:
         tbi="results/{sample}/variants/{sample}.vcf.gz.tbi",
     container:
@@ -315,7 +379,7 @@ rule index_called_vcf:
 
 rule filter_snps_for_phasing:
     input:
-        vcf=rules.call_clair3.output.vcf,
+        vcf=rules.call_clair.output.vcf,
         tbi=rules.index_called_vcf.output.tbi,
     output:
         vcf=temp("results/{sample}/variants/{sample}.snps.filtered.vcf"),
@@ -329,13 +393,24 @@ rule filter_snps_for_phasing:
         """
         mkdir -p $(dirname {log})
         (
+          tmp_vcf={output.vcf}.tmp
           vcftools \
             --gzvcf {input.vcf} \
             --minQ {params.min_q} \
             --recode \
             --recode-INFO-all \
             --stdout \
-          > {output.vcf}
+          > "$tmp_vcf"
+
+          site_count=$(grep -vc '^#' "$tmp_vcf" || true)
+          if [[ "${{site_count:-0}}" -eq 0 ]]; then
+            echo "No variants passed filter_snps_for_phasing (--minQ {params.min_q})." >&2
+            echo "Lower config:snp_filter:min_q for Clair QUAL scale." >&2
+            rm -f "$tmp_vcf"
+            exit 1
+          fi
+
+          mv "$tmp_vcf" {output.vcf}
         ) > {log} 2>&1
         """
 
@@ -474,7 +549,7 @@ rule index_xist_vcf:
 
 rule summarize_called_vcf:
     input:
-        vcf=rules.call_clair3.output.vcf,
+        vcf=rules.call_clair.output.vcf,
         tbi=rules.index_called_vcf.output.tbi,
         script="workflow/scripts/summarize_vcf_metrics.py",
     output:
