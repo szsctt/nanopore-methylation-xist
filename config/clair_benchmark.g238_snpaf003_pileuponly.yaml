@@ -1,0 +1,42 @@
+# XIST-focused Clair benchmark: g238 with lower SNP AF and pileup-only mode.
+
+benchmark_name: "clair_xist_g238_snpaf003_pileuponly"
+
+sample_table: "config/samples.tsv"
+benchmark_samples:
+  - "OTC3"
+
+reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+
+xist_region:
+  chrom: "chrX"
+  start: 73813879
+  end: 73862026
+
+bind_path: "/data/home/sscott@cmri.com.au/Projects/mawj_data_tmp"
+
+threads:
+  clair3: 12
+
+clair3:
+  platform: "ont"
+  extra_args: "--snp_min_af=0.03 --pileup_only"
+
+clair3_model:
+  name: "r941_prom_hac_g238"
+  source_url: "https://www.bio8.cs.hku.hk/clair3/clair3_models/r941_prom_hac_g238.tar.gz"
+
+truth:
+  xist_vcf: "previous_results/GSM9351546_{sample}.XIST.filt.vcf.gz"
+
+versions:
+  - "v0.1-r10"
+  - "v0.1-r11"
+  - "v0.1-r12"
+  - "v1.0.0"
+  - "v1.0.3"
+
+containers:
+  download: "docker://docker.io/hkubal/clair3:v0.1-r12"
+  samtools: "docker://quay.io/biocontainers/samtools:1.23.1--ha83d96e_0"
+

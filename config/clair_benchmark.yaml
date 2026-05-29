@@ -1,0 +1,55 @@
+# Separate, fast Clair benchmark workflow focused on the XIST region.
+# Run with:
+# snakemake -s workflow/clair_benchmark_xist.smk --configfile config/clair_benchmark.yaml ...
+
+# Distinguish output paths across model/parameter sweeps.
+# Results are written to: results/{sample}/benchmarks/{benchmark_name}/...
+benchmark_name: "clair_xist"
+
+sample_table: "config/samples.tsv"
+benchmark_samples:
+  - "OTC3"
+
+# Reuse existing aligned BAM/reference from the main workflow outputs.
+reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+
+xist_region:
+  chrom: "chrX"
+  start: 73813879
+  end: 73862026
+
+# Optional explicit bind root for manual singularity/apptainer exec.
+# Set to empty string to rely on default runtime binds.
+bind_path: "/data/home/sscott@cmri.com.au/Projects/mawj_data_tmp"
+
+threads:
+  clair3: 12
+
+clair3:
+  platform: "ont"
+  # Optional additional run_clair3 arguments (old Clair prefers --flag=value), e.g. "--snp_min_af=0.1 --indel_min_af=0.2".
+  extra_args: ""
+
+# Legacy TensorFlow-era model expected by Clair3 v0.1-r10/r11/r12 and early v1.0.x.
+# source_url can be a .tar.gz model archive or a directory URL containing pileup.pt/full_alignment.pt.
+clair3_model:
+  name: "r941_prom_hac_g360+g422"
+  source_url: "https://www.bio8.cs.hku.hk/clair3/clair3_models/r941_prom_hac_g360+g422.tar.gz"
+
+# Previous result to match against.
+# {sample} is replaced from benchmark_samples.
+truth:
+  xist_vcf: "previous_results/GSM9351546_{sample}.XIST.filt.vcf.gz"
+
+# These versions are roughly 1-2 years after 2021 sequencing.
+versions:
+  - "v0.1-r10"
+  - "v0.1-r11"
+  - "v0.1-r12"
+  - "v1.0.0"
+  - "v1.0.3"
+
+containers:
+  # Used for model download/extraction only.
+  download: "docker://docker.io/hkubal/clair3:v0.1-r12"
+  samtools: "docker://quay.io/biocontainers/samtools:1.23.1--ha83d96e_0"

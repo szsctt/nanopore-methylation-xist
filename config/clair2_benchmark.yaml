@@ -1,0 +1,54 @@
+# Separate XIST-only benchmark for Clair v2 (not Clair3).
+# This does not touch the long-running main workflow outputs.
+#
+# Run with:
+# snakemake \
+#   -s workflow/clair2_benchmark_xist.smk \
+#   --configfile config/clair2_benchmark.yaml \
+#   --use-singularity \
+#   --cores 24 \
+#   --rerun-incomplete \
+#   --nolock \
+#   --singularity-args '-B /data/home/sscott@cmri.com.au/Projects/mawj_data_tmp' \
+#   results/OTC3/benchmarks/clair2_xist_v211/v2.1.1/OTC3.comparison.tsv
+
+benchmark_name: "clair2_xist_v211"
+
+sample_table: "config/samples.tsv"
+benchmark_samples:
+  - "OTC3"
+
+reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+
+xist_region:
+  chrom: "chrX"
+  start: 73813879
+  end: 73862026
+
+threads:
+  clair2: 12
+
+clair2:
+  # Clair v2 callVarBam options:
+  threshold: 0.125
+  min_coverage: 4
+  # Optional extra args (must use '=' syntax), e.g. "--qual=2".
+  extra_args: ""
+
+# Clair v2 model files (TensorFlow checkpoint triplet) from Clair docs:
+# https://www.bio8.cs.hku.hk/clair_models/ont/
+clair2_model:
+  name: "ont_122HD34"
+  source_url: "http://www.bio8.cs.hku.hk/clair_models/ont/122HD34.tar"
+
+truth:
+  xist_vcf: "previous_results/GSM9351546_{sample}.XIST.filt.vcf.gz"
+
+versions:
+  - "v2.1.1"
+
+containers:
+  # Used for model download/extraction.
+  download: "docker://docker.io/hkubal/clair3:v0.1-r12"
+  samtools: "docker://quay.io/biocontainers/samtools:1.23.1--ha83d96e_0"
+  clair2: "docker://quay.io/biocontainers/clair:2.1.1--0"
