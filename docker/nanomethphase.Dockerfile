@@ -51,9 +51,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
-# Install DSS for nanomethphase dma subcommand.
-RUN Rscript -e "install.packages('BiocManager', repos='https://cloud.r-project.org')" \
- && Rscript -e "BiocManager::install('DSS', ask=FALSE, update=FALSE)"
+# Install R deps for nanomethphase dma subcommand.
+# `sys` and `R.utils` are required by the upstream DSS_DMA.R script.
+# `DSS` pulls Bioconductor dependencies used by DMA (e.g. BSseq).
+RUN Rscript -e "install.packages(c('BiocManager','sys','R.utils'), repos='https://cloud.r-project.org')" \
+ && Rscript -e "BiocManager::install('DSS', ask=FALSE, update=FALSE)" \
+ && Rscript -e "pkgs <- c('sys','R.utils','DSS','BSseq','Rsamtools','GenomicRanges','IRanges','S4Vectors','Biobase'); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) stop(paste('Missing R packages:', paste(miss, collapse=', '))); cat('R lib paths:', paste(.libPaths(), collapse=':'), '\n')"
 
 RUN printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec /opt/venv/bin/python3 -m nanomethphase "$@"' > /usr/local/bin/nanomethphase \
  && chmod +x /usr/local/bin/nanomethphase \
