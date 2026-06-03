@@ -60,7 +60,6 @@ rule all:
         expand("results/{sample}/qc/{sample}.phased.vcf.summary.tsv", sample=SAMPLE_NAMES),
         expand("results/{sample}/qc/{sample}.XIST.filt.vcf.summary.tsv", sample=SAMPLE_NAMES),
         expand("results/{sample}/nanopolish/{sample}.methylation_calls.tsv", sample=SAMPLE_NAMES),
-        expand("results/{sample}/nanomethphase/{sample}.gtf.gz", sample=SAMPLE_NAMES),
         expand(
             "results/{sample}/nanomethphase/{sample}_NanoMethPhase_{hap}_MethylFrequency.bedgraph.gz",
             sample=SAMPLE_NAMES,
@@ -700,7 +699,6 @@ rule nanomethphase_phase:
     output:
         hp1="results/{sample}/nanomethphase/{sample}_NanoMethPhase_HP1_MethylFrequency.tsv",
         hp2="results/{sample}/nanomethphase/{sample}_NanoMethPhase_HP2_MethylFrequency.tsv",
-        gtf="results/{sample}/nanomethphase/{sample}.gtf",
     params:
         prefix=lambda wc: f"results/{wc.sample}/nanomethphase/{wc.sample}",
     threads: THREADS["nanomethphase_phase"]
@@ -720,29 +718,11 @@ rule nanomethphase_phase:
             -r {input.ref} \
             -o {params.prefix} \
             -of methylcall \
-            -t {threads}
+            -t {threads} \
+            --overwrite
 
           test -s {output.hp1}
           test -s {output.hp2}
-          test -s {output.gtf}
-        ) > {log} 2>&1
-        """
-
-
-rule bgzip_gtf:
-    input:
-        gtf=rules.nanomethphase_phase.output.gtf,
-    output:
-        gtf="results/{sample}/nanomethphase/{sample}.gtf.gz",
-    container:
-        CONTAINERS["samtools"]
-    log:
-        "logs/{sample}/bgzip_gtf.log",
-    shell:
-        """
-        mkdir -p $(dirname {log})
-        (
-          bgzip -c {input.gtf} > {output.gtf}
         ) > {log} 2>&1
         """
 
@@ -812,7 +792,8 @@ rule nanomethphase_dma:
             -ca {input.hp1} \
             -co {input.hp2} \
             -o {params.outdir} \
-            -op {params.prefix}
+            -op {params.prefix} \
+            -ow
 
           test -s {output.dml}
           test -s {output.dmr}
