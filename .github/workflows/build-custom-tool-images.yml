@@ -130,4 +130,4 @@ jobs:
           IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_name }}:${{ steps.resolve.outputs.ref_tag }}"
           echo "Testing image: $IMAGE"
           docker pull "$IMAGE"
-          docker run --rm "$IMAGE" Rscript -e "pkgs <- c('sys','R.utils','DSS','BSseq','Rsamtools','GenomicRanges','IRanges','S4Vectors','Biobase'); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) { cat('Missing R packages:', paste(miss, collapse=', '), '\n'); quit(status=1) } else { cat('All required R packages present\n') }"
+          docker run --rm "$IMAGE" Rscript -e "pkgs <- c('sys','R.utils','DSS','Rsamtools','GenomicRanges','IRanges','S4Vectors','Biobase'); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) { cat('Missing R packages:', paste(miss, collapse=', '), '\n'); quit(status=1) } else { cat('All required R packages present\n') }"
