@@ -46,21 +46,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-openssl-dev \
     libssl-dev \
     libxml2-dev \
-    r-cran-biocmanager \
-    r-cran-sys \
-    r-cran-r.utils \
-    r-cran-scales \
-    r-cran-locfit \
-    r-bioc-bsgenome \
-    r-bioc-rtracklayer \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # Install DSS for nanomethphase dma subcommand.
-# Core CRAN/Bioc deps are preinstalled from apt to avoid resolver drift for R 3.6.
-RUN Rscript -e "BiocManager::install('DSS', ask=FALSE, update=FALSE)" \
+# Prefer CRAN install first. If packages are unavailable for this R release,
+# use apt fallback, then complete Bioconductor installs.
+RUN Rscript -e "cran <- c('BiocManager','sys','R.utils','scales','locfit'); miss <- cran[!vapply(cran, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) install.packages(miss, repos='https://cloud.r-project.org')" || true
+
+RUN set -eux; \
+    apt-get update; \
+    for pkg in r-cran-biocmanager r-cran-sys r-cran-r.utils r-cran-scales r-cran-locfit r-bioc-bsgenome r-bioc-rtracklayer; do \
+      apt-get install -y --no-install-recommends "$pkg" || echo "APT package not available: $pkg"; \
+    done; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN Rscript -e "cran <- c('BiocManager','sys','R.utils','scales','locfit'); miss <- cran[!vapply(cran, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) install.packages(miss, repos='https://cloud.r-project.org')" \
+ && Rscript -e "bioc <- c('rtracklayer','BSgenome','DSS'); miss <- bioc[!vapply(bioc, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) BiocManager::install(miss, ask=FALSE, update=FALSE)" \
  && Rscript -e "pkgs <- c('sys','R.utils','DSS','BSseq','Rsamtools','GenomicRanges','IRanges','S4Vectors','Biobase'); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) stop(paste('Missing R packages:', paste(miss, collapse=', '))); cat('R lib paths:', paste(.libPaths(), collapse=':'), '\n')"
 
 RUN printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec /opt/venv/bin/python3 -m nanomethphase "$@"' > /usr/local/bin/nanomethphase \
