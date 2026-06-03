@@ -68,7 +68,7 @@ RUN set -eux; \
 RUN Rscript -e "cran <- c('BiocManager','sys','R.utils','scales'); miss <- cran[!vapply(cran, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) install.packages(miss, repos='https://cloud.r-project.org')" \
  && Rscript -e "if (!requireNamespace('locfit', quietly=TRUE)) { if (getRversion() < '4.1.0') { install.packages('https://cran.r-project.org/src/contrib/Archive/locfit/locfit_1.5-9.4.tar.gz', repos=NULL, type='source') } else { install.packages('locfit', repos='https://cloud.r-project.org') } }" \
  && Rscript -e "bioc <- c('rtracklayer','BSgenome','DSS'); miss <- bioc[!vapply(bioc, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) BiocManager::install(miss, ask=FALSE, update=FALSE)" \
- && Rscript -e "pkgs <- c('sys','R.utils','DSS','BSseq','Rsamtools','GenomicRanges','IRanges','S4Vectors','Biobase'); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) stop(paste('Missing R packages:', paste(miss, collapse=', '))); cat('R lib paths:', paste(.libPaths(), collapse=':'), '\n')"
+ && Rscript -e "pkgs <- c('sys','R.utils','DSS','Rsamtools','GenomicRanges','IRanges','S4Vectors','Biobase'); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) stop(paste('Missing R packages:', paste(miss, collapse=', '))); cat('R lib paths:', paste(.libPaths(), collapse=':'), '\n')"
 
 RUN printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec /opt/venv/bin/python3 -m nanomethphase "$@"' > /usr/local/bin/nanomethphase \
  && chmod +x /usr/local/bin/nanomethphase \
