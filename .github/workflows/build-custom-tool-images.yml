@@ -1,12 +1,8 @@
-name: Build Custom Clair3 and NanoMethPhase Images
+name: Build Custom NanoMethPhase Image
 
 on:
   workflow_dispatch:
     inputs:
-      clair3_ref:
-        description: "Git ref for HKU-BAL/Clair3 (branch, tag, or SHA)"
-        required: false
-        default: "main"
       nanomethphase_ref:
         description: "Git ref for vahidAK/NanoMethPhase (branch, tag, or SHA)"
         required: false
@@ -21,7 +17,7 @@ on:
 
 jobs:
   build-and-push:
-    name: Build and push ${{ matrix.tool }}
+    name: Build and push nanomethphase
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -29,16 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - tool: clair3
-            upstream_repo: HKU-BAL/Clair3
-            default_ref: main
-            build_context: src
-            dockerfile: src/Dockerfile
-            image_name: clair3
-            build_arg_name: ""
-          - tool: nanomethphase
-            upstream_repo: ""
-            default_ref: master
+          - default_ref: master
             build_context: .
             dockerfile: docker/nanomethphase.Dockerfile
             image_name: nanomethphase
@@ -52,11 +39,7 @@ jobs:
         id: resolve
         shell: bash
         run: |
-          if [[ "${{ matrix.tool }}" == "clair3" ]]; then
-            REF_INPUT='${{ github.event.inputs.clair3_ref }}'
-          else
-            REF_INPUT='${{ github.event.inputs.nanomethphase_ref }}'
-          fi
+          REF_INPUT='${{ github.event.inputs.nanomethphase_ref }}'
 
           if [[ -z "$REF_INPUT" ]]; then
             REF_INPUT='${{ matrix.default_ref }}'
@@ -67,15 +50,6 @@ jobs:
           echo "ref=$REF_INPUT" >> "$GITHUB_OUTPUT"
           echo "ref_tag=$REF_TAG" >> "$GITHUB_OUTPUT"
           echo "build_date=$BUILD_DATE" >> "$GITHUB_OUTPUT"
-
-      - name: Check out upstream repository
-        if: matrix.upstream_repo != ''
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ matrix.upstream_repo }}
-          ref: ${{ steps.resolve.outputs.ref }}
-          path: src
-          fetch-depth: 1
 
       - name: Compose Docker tags
         id: tags
@@ -128,7 +102,6 @@ jobs:
       - name: Debug build inputs
         shell: bash
         run: |
-          echo "tool=${{ matrix.tool }}"
           echo "build_context=${{ matrix.build_context }}"
           echo "dockerfile=${{ matrix.dockerfile }}"
           if [[ -f "${{ matrix.dockerfile }}" ]]; then
@@ -152,7 +125,6 @@ jobs:
           sbom: false
 
       - name: Smoke test nanomethphase R packages
-        if: matrix.tool == 'nanomethphase'
         shell: bash
         run: |
           IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_name }}:${{ steps.resolve.outputs.ref_tag }}"
