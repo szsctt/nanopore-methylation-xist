@@ -46,16 +46,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcurl4-openssl-dev \
     libssl-dev \
     libxml2-dev \
+    r-cran-biocmanager \
+    r-cran-sys \
+    r-cran-r.utils \
+    r-cran-scales \
+    r-cran-locfit \
+    r-bioc-bsgenome \
+    r-bioc-rtracklayer \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
-# Install R deps for nanomethphase dma subcommand.
-# `sys` and `R.utils` are required by the upstream DSS_DMA.R script.
-# `DSS` pulls Bioconductor dependencies used by DMA (e.g. BSseq).
-RUN Rscript -e "install.packages(c('BiocManager','sys','R.utils'), repos='https://cloud.r-project.org')" \
- && Rscript -e "BiocManager::install('DSS', ask=FALSE, update=FALSE)" \
+# Install DSS for nanomethphase dma subcommand.
+# Core CRAN/Bioc deps are preinstalled from apt to avoid resolver drift for R 3.6.
+RUN Rscript -e "BiocManager::install('DSS', ask=FALSE, update=FALSE)" \
  && Rscript -e "pkgs <- c('sys','R.utils','DSS','BSseq','Rsamtools','GenomicRanges','IRanges','S4Vectors','Biobase'); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) stop(paste('Missing R packages:', paste(miss, collapse=', '))); cat('R lib paths:', paste(.libPaths(), collapse=':'), '\n')"
 
 RUN printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec /opt/venv/bin/python3 -m nanomethphase "$@"' > /usr/local/bin/nanomethphase \
