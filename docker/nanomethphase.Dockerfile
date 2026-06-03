@@ -52,9 +52,11 @@ COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # Install DSS for nanomethphase dma subcommand.
-# Prefer CRAN install first. If packages are unavailable for this R release,
-# use apt fallback, then complete Bioconductor installs.
-RUN Rscript -e "cran <- c('BiocManager','sys','R.utils','scales','locfit'); miss <- cran[!vapply(cran, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) install.packages(miss, repos='https://cloud.r-project.org')" || true
+# Ubuntu 20.04 ships R 3.6; current CRAN locfit requires newer R, so we pin
+# an archive release when needed.
+RUN Rscript -e "cran <- c('BiocManager','sys','R.utils','scales'); miss <- cran[!vapply(cran, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) install.packages(miss, repos='https://cloud.r-project.org')" || true
+
+RUN Rscript -e "if (!requireNamespace('locfit', quietly=TRUE)) { if (getRversion() < '4.1.0') { install.packages('https://cran.r-project.org/src/contrib/Archive/locfit/locfit_1.5-9.4.tar.gz', repos=NULL, type='source') } else { install.packages('locfit', repos='https://cloud.r-project.org') } }"
 
 RUN set -eux; \
     apt-get update; \
@@ -63,7 +65,8 @@ RUN set -eux; \
     done; \
     rm -rf /var/lib/apt/lists/*
 
-RUN Rscript -e "cran <- c('BiocManager','sys','R.utils','scales','locfit'); miss <- cran[!vapply(cran, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) install.packages(miss, repos='https://cloud.r-project.org')" \
+RUN Rscript -e "cran <- c('BiocManager','sys','R.utils','scales'); miss <- cran[!vapply(cran, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) install.packages(miss, repos='https://cloud.r-project.org')" \
+ && Rscript -e "if (!requireNamespace('locfit', quietly=TRUE)) { if (getRversion() < '4.1.0') { install.packages('https://cran.r-project.org/src/contrib/Archive/locfit/locfit_1.5-9.4.tar.gz', repos=NULL, type='source') } else { install.packages('locfit', repos='https://cloud.r-project.org') } }" \
  && Rscript -e "bioc <- c('rtracklayer','BSgenome','DSS'); miss <- bioc[!vapply(bioc, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) BiocManager::install(miss, ask=FALSE, update=FALSE)" \
  && Rscript -e "pkgs <- c('sys','R.utils','DSS','BSseq','Rsamtools','GenomicRanges','IRanges','S4Vectors','Biobase'); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) stop(paste('Missing R packages:', paste(miss, collapse=', '))); cat('R lib paths:', paste(.libPaths(), collapse=':'), '\n')"
 
