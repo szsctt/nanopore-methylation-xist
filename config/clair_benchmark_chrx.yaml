@@ -1,0 +1,33 @@
+sample_table: "config/samples.tsv"
+reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+truth_vcf: "previous_results/GSM9351546_OTC3.vcf.gz"
+
+chrom: "chrX"
+threads: 12
+
+# Clair2 callVarBam parameters
+threshold: 0.125
+min_coverage: 4
+extra_args: ""
+
+# Optional: host path to bind into apptainer/singularity
+bind_path: "/data/home/sscott@cmri.com.au/Projects/mawj_data_tmp"
+
+# Use Clair2 here (not Clair3).
+# Tags verified from quay.io/api/v1/repository/biocontainers/clair/tag/.
+versions:
+  - "2.0.7--0"
+  - "2.1.0--0"
+  - "2.1.0--1"
+  - "2.1.1--0"
+  - "2.1.1--hdfd78af_1"
+
+container_by_version:
+  "2.0.7--0": "docker://quay.io/biocontainers/clair:2.0.7--0"
+  "2.1.0--0": "docker://quay.io/biocontainers/clair:2.1.0--0"
+  "2.1.0--1": "docker://quay.io/biocontainers/clair:2.1.0--1"
+  "2.1.1--0": "docker://quay.io/biocontainers/clair:2.1.1--0"
+  "2.1.1--hdfd78af_1": "docker://quay.io/biocontainers/clair:2.1.1--hdfd78af_1"
+
+# Existing local Clair2 model directory (contains model.index/model.meta/model.data-00000-of-00001)
+model_path: "resources/models/clair/ont_122HD34"

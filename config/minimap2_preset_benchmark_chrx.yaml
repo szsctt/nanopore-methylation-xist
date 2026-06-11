@@ -1,0 +1,38 @@
+sample_table: "config/samples.tsv"
+reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+truth_vcf: "previous_results/GSM9351546_OTC3.vcf.gz"
+chrom: "chrX"
+
+# Benchmark matrix: minimap2 versions x presets.
+# Tags were checked from quay.io biocontainers/minimap2.
+minimap2_versions:
+  - "2.20--h5bf99c6_0"
+  - "2.22--h5bf99c6_0"
+  - "2.24--h5bf99c6_0"
+
+minimap2_presets:
+  - "map-ont"
+  - "map-pb"
+  - "asm20"
+
+minimap2_container_by_version:
+  "2.20--h5bf99c6_0": "docker://quay.io/biocontainers/minimap2:2.20--h5bf99c6_0"
+  "2.22--h5bf99c6_0": "docker://quay.io/biocontainers/minimap2:2.22--h5bf99c6_0"
+  "2.24--h5bf99c6_0": "docker://quay.io/biocontainers/minimap2:2.24--h5bf99c6_0"
+
+# Optional extra minimap2 args (string), e.g. "--secondary=no"
+minimap2_extra_args: ""
+
+samtools_container: "docker://quay.io/biocontainers/samtools:1.23.1--ha83d96e_0"
+clair_container: "docker://quay.io/biocontainers/clair:2.1.1--0"
+clair_model_dir: "resources/models/clair/ont_122HD34"
+
+clair_threshold: 0.125
+clair_min_coverage: 4
+clair_extra_args: ""
+
+threads_align: 12
+threads_sort: 8
+threads_clair: 12
+
+bind_path: "/data/home/sscott@cmri.com.au/Projects/mawj_data_tmp"
