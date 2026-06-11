@@ -777,6 +777,8 @@ rule nanomethphase_dma:
         outdir=lambda wc: f"results/{wc.sample}/dma",
         prefix=lambda wc: f"{wc.sample}_XIST",
         columns=config["dma"]["columns"],
+        dss_version=config["dma"].get("dss_version", "2.58.0"),
+        rscript=config["dma"].get("rscript", "Rscript"),
     threads: THREADS["dma"]
     container:
         CONTAINERS["nanomethphase"]
@@ -787,12 +789,14 @@ rule nanomethphase_dma:
         mkdir -p $(dirname {log})
         (
           mkdir -p {params.outdir}
+          {params.rscript} -e "v <- as.character(packageVersion('DSS')); cat('DSS version:', v, '\\n'); if (!identical(v, '{params.dss_version}')) stop(paste('Expected DSS', '{params.dss_version}', 'got', v))"
           python3 -m nanomethphase dma \
             -c {params.columns} \
             -ca {input.hp1} \
             -co {input.hp2} \
             -o {params.outdir} \
             -op {params.prefix} \
+            --Rscript {params.rscript} \
             -ow
 
           test -s {output.dml}
