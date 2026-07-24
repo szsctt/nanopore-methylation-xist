@@ -1,0 +1,8 @@
+sample: "OTC3"
+chrom: "chrX"
+
+raw_vcf: "previous_results/OTC3.chrXcalls.vcf"
+target_vcf: "previous_results/GSM9351546_OTC3.vcf.gz"
+
+outdir: "results/OTC3/benchmarks/previous_chrx_filter"
+top_n: 100

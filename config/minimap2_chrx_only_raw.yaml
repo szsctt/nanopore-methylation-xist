@@ -1,0 +1,36 @@
+sample_table: "config/samples.tsv"
+source_reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+reference_fasta: "resources/reference/chrX.GRCh38_no_alt_analysis_set.fna"
+truth_vcf: "previous_results/OTC3.chrXcalls.vcf"
+chrom: "chrX"
+
+outdir: "results/{sample}/benchmarks/minimap2_chrx_only_raw"
+workdir: "work/benchmark_minimap2_chrx_only_raw"
+logdir: "logs/benchmark_minimap2_chrx_only_raw"
+
+# Focused reference-composition test:
+# align to chrX only, then call with the best current combination.
+minimap2_versions:
+  - "2.18--h5bf99c6_0"
+
+minimap2_presets:
+  - "map-ont"
+
+minimap2_container_by_version:
+  "2.18--h5bf99c6_0": "docker://quay.io/biocontainers/minimap2:2.18--h5bf99c6_0"
+
+minimap2_extra_args: ""
+
+samtools_container: "docker://quay.io/biocontainers/samtools:1.23.1--ha83d96e_0"
+clair_container: "docker://quay.io/biocontainers/clair:2.1.1--0"
+clair_model_dir: "resources/models/clair/ont_122HD34"
+
+clair_threshold: 0.125
+clair_min_coverage: 4
+clair_extra_args: ""
+
+threads_align: 12
+threads_sort: 8
+threads_clair: 12
+
+bind_path: "/data/home/sscott@cmri.com.au/Projects/mawj_data_tmp"

@@ -23,6 +23,16 @@ if not versions:
 for v in versions:
     if v not in container_by_version:
         raise ValueError(f"Missing config:container_by_version entry for version '{v}'")
+    image = str(container_by_version[v]).lower()
+    if "clair3" in image or "hkubal/clair3" in image:
+        raise ValueError(
+            f"Version '{v}' is configured with a Clair3 image ({container_by_version[v]}). "
+            "This benchmark workflow is Clair2-only."
+        )
+    if "biocontainers/clair:" not in image:
+        raise ValueError(
+            f"Version '{v}' does not point to a Clair2 biocontainers image: {container_by_version[v]}"
+        )
 
 
 rule all:

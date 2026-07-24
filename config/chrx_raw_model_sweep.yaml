@@ -1,0 +1,63 @@
+sample_table: "config/samples.tsv"
+reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+truth_vcf: "previous_results/OTC3.chrXcalls.vcf"
+chrom: "chrX"
+
+# Reuse the existing benchmark alignment for the first focused pass:
+# minimap2 2.20, map-ont.
+bam_template: "results/{sample}/benchmarks/minimap2_chrx/2.20--h5bf99c6_0/map-ont/{sample}.sorted.bam"
+
+outdir: "results/{sample}/benchmarks/chrx_raw_model_sweep"
+workdir: "work/benchmark_chrx_raw_model_sweep"
+logdir: "logs/benchmark_chrx_raw_model_sweep"
+
+threads: 12
+bind_path: "/data/home/sscott@cmri.com.au/Projects/mawj_data_tmp"
+
+# Clair2 callVarBam parameters.
+clair2_threshold: 0.125
+clair2_min_coverage: 4
+clair2_extra_args: ""
+
+clair3_platform: "ont"
+
+models:
+  clair2_ont122_main:
+    caller: "clair2"
+    container: "docker://quay.io/biocontainers/clair:2.1.1--0"
+    model_path: "resources/models/clair/ont_122HD34"
+
+  clair2_ont122_xist_v211:
+    caller: "clair2"
+    container: "docker://quay.io/biocontainers/clair:2.1.1--0"
+    model_path: "resources/models/clair2_xist_v211/ont_122HD34"
+
+  clair3_hac_g238:
+    caller: "clair3"
+    container: "docker://hkubal/clair3:v1.0.3"
+    model_path: "resources/models/clair_xist_model_hac_g238/r941_prom_hac_g238"
+
+  clair3_hac_g360g422:
+    caller: "clair3"
+    container: "docker://hkubal/clair3:v1.0.3"
+    model_path: "resources/models/clair_xist_model_hac_g360g422/r941_prom_hac_g360+g422"
+
+  clair3_hac_g360g422_1235:
+    caller: "clair3"
+    container: "docker://hkubal/clair3:v1.0.3"
+    model_path: "resources/models/clair_xist_model_hac_g360g422_1235/r941_prom_hac_g360+g422_1235"
+
+  clair3_ont:
+    caller: "clair3"
+    container: "docker://hkubal/clair3:v1.0.3"
+    model_path: "resources/models/clair_xist_model_ont/ont"
+
+  clair3_ont_guppy2:
+    caller: "clair3"
+    container: "docker://hkubal/clair3:v1.0.3"
+    model_path: "resources/models/clair_xist_model_ont_guppy2/ont_guppy2"
+
+  clair3_ont_guppy5:
+    caller: "clair3"
+    container: "docker://hkubal/clair3:v1.0.3"
+    model_path: "resources/models/clair_xist_model_ont_guppy5/ont_guppy5"

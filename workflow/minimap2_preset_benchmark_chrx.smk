@@ -34,6 +34,17 @@ clair_threshold = config.get("clair_threshold", 0.125)
 clair_min_coverage = config.get("clair_min_coverage", 4)
 clair_extra_args = config.get("clair_extra_args", "")
 
+clair_image = str(clair_container).lower()
+if "clair3" in clair_image or "hkubal/clair3" in clair_image:
+    raise ValueError(
+        f"clair_container is set to a Clair3 image ({clair_container}). "
+        "This benchmark workflow is Clair2-only."
+    )
+if "biocontainers/clair:" not in clair_image:
+    raise ValueError(
+        f"clair_container must point to a Clair2 biocontainers image, got: {clair_container}"
+    )
+
 
 def combos_for_sample(sample):
     return [(sample, v, p) for v in mm2_versions for p in mm2_presets]

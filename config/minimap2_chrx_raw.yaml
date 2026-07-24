@@ -1,0 +1,45 @@
+sample_table: "config/samples.tsv"
+reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+truth_vcf: "previous_results/OTC3.chrXcalls.vcf"
+chrom: "chrX"
+
+outdir: "results/{sample}/benchmarks/minimap2_chrx_raw"
+workdir: "work/benchmark_minimap2_chrx_raw"
+logdir: "logs/benchmark_minimap2_chrx_raw"
+
+# Focused early-2021 minimap2 sweep. Keep map-ont fixed first because it was
+# the best preset in the earlier published-VCF benchmark.
+minimap2_versions:
+  - "2.16--h84994c4_1"
+  - "2.17--hed695b0_3"
+  - "2.17--h5bf99c6_4"
+  - "2.18--h5bf99c6_0"
+  - "2.19--h5bf99c6_0"
+  - "2.20--h5bf99c6_0"
+
+minimap2_presets:
+  - "map-ont"
+
+minimap2_container_by_version:
+  "2.16--h84994c4_1": "docker://quay.io/biocontainers/minimap2:2.16--h84994c4_1"
+  "2.17--hed695b0_3": "docker://quay.io/biocontainers/minimap2:2.17--hed695b0_3"
+  "2.17--h5bf99c6_4": "docker://quay.io/biocontainers/minimap2:2.17--h5bf99c6_4"
+  "2.18--h5bf99c6_0": "docker://quay.io/biocontainers/minimap2:2.18--h5bf99c6_0"
+  "2.19--h5bf99c6_0": "docker://quay.io/biocontainers/minimap2:2.19--h5bf99c6_0"
+  "2.20--h5bf99c6_0": "docker://quay.io/biocontainers/minimap2:2.20--h5bf99c6_0"
+
+minimap2_extra_args: ""
+
+samtools_container: "docker://quay.io/biocontainers/samtools:1.23.1--ha83d96e_0"
+clair_container: "docker://quay.io/biocontainers/clair:2.1.1--0"
+clair_model_dir: "resources/models/clair/ont_122HD34"
+
+clair_threshold: 0.125
+clair_min_coverage: 4
+clair_extra_args: ""
+
+threads_align: 12
+threads_sort: 8
+threads_clair: 12
+
+bind_path: "/data/home/sscott@cmri.com.au/Projects/mawj_data_tmp"

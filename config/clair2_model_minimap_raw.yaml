@@ -1,0 +1,36 @@
+sample_table: "config/samples.tsv"
+reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+truth_vcf: "previous_results/OTC3.chrXcalls.vcf"
+chrom: "chrX"
+
+outdir: "results/{sample}/benchmarks/clair2_model_minimap_raw"
+workdir: "work/benchmark_clair2_model_minimap_raw"
+logdir: "logs/benchmark_clair2_model_minimap_raw"
+
+# Reuse existing raw minimap2 benchmark BAMs. 2.18 is in the better group and
+# 2.19 is the first worse group, so this tests whether older Clair models
+# recover variants across the alignment-version boundary.
+minimap2_versions:
+  - "2.18--h5bf99c6_0"
+  - "2.19--h5bf99c6_0"
+
+bam_template: "results/{sample}/benchmarks/minimap2_chrx_raw/{mm2ver}/map-ont/{sample}.sorted.bam"
+
+models:
+  "12": "resources/models/clair/12.tar"
+  "1_44x": "resources/models/clair/1_44x.tar"
+  "1_44x_single_cov": "resources/models/clair/1_44x_single_cov.tar"
+  "1_124x": "resources/models/clair/1_124x.tar"
+  "1_168x": "resources/models/clair/1_168x.tar"
+  "1234": "resources/models/clair/1234.tar"
+  "122HD34": "resources/models/clair/122HD34.tar"
+
+prepared_model_dir: "resources/models/clair_prepared"
+
+clair_container: "docker://quay.io/biocontainers/clair:2.1.1--0"
+clair_threshold: 0.125
+clair_min_coverage: 4
+clair_extra_args: ""
+
+threads_clair: 12
+bind_path: "/data/home/sscott@cmri.com.au/Projects/mawj_data_tmp"

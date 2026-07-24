@@ -15,6 +15,12 @@ def main() -> None:
     p = argparse.ArgumentParser(description='Rank Clair benchmark comparison rows.')
     p.add_argument('--inputs', nargs='+', required=True)
     p.add_argument('--output', required=True)
+    p.add_argument(
+        '--sort-by',
+        choices=['snp', 'any'],
+        default='snp',
+        help='Rank by SNP metrics or all-variant metrics. Default: snp',
+    )
     args = p.parse_args()
 
     rows = []
@@ -24,15 +30,26 @@ def main() -> None:
             for row in reader:
                 rows.append(row)
 
-    rows.sort(
-        key=lambda r: (
-            to_float(r.get('f1_snp', '0')),
-            to_float(r.get('recall_snp', '0')),
-            to_float(r.get('precision_snp', '0')),
-            -to_float(r.get('candidate_snp', '0')),
-        ),
-        reverse=True,
-    )
+    if args.sort_by == 'any':
+        rows.sort(
+            key=lambda r: (
+                to_float(r.get('f1_any', '0')),
+                to_float(r.get('recall_any', '0')),
+                to_float(r.get('precision_any', '0')),
+                -to_float(r.get('candidate_any', '0')),
+            ),
+            reverse=True,
+        )
+    else:
+        rows.sort(
+            key=lambda r: (
+                to_float(r.get('f1_snp', '0')),
+                to_float(r.get('recall_snp', '0')),
+                to_float(r.get('precision_snp', '0')),
+                -to_float(r.get('candidate_snp', '0')),
+            ),
+            reverse=True,
+        )
 
     Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     fields = [
