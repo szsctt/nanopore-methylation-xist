@@ -384,6 +384,12 @@ rule filter_snps_for_phasing:
         vcf=temp("results/{sample}/variants/{sample}.snps.filtered.vcf"),
     params:
         min_q=config["snp_filter"]["min_q"],
+        biallelic_snp_only=config["snp_filter"].get("biallelic_snp_only", False),
+        biallelic_snp_args=(
+            "--remove-indels --min-alleles 2 --max-alleles 2"
+            if config["snp_filter"].get("biallelic_snp_only", False)
+            else ""
+        ),
     container:
         CONTAINERS["vcftools"]
     log:
@@ -396,6 +402,7 @@ rule filter_snps_for_phasing:
           vcftools \
             --gzvcf {input.vcf} \
             --minQ {params.min_q} \
+            {params.biallelic_snp_args} \
             --recode \
             --recode-INFO-all \
             --stdout \
@@ -403,7 +410,8 @@ rule filter_snps_for_phasing:
 
           site_count=$(grep -vc '^#' "$tmp_vcf" || true)
           if [[ "${{site_count:-0}}" -eq 0 ]]; then
-            echo "No variants passed filter_snps_for_phasing (--minQ {params.min_q})." >&2
+            echo "No variants passed filter_snps_for_phasing." >&2
+            echo "Filter: biallelic_snp_only={params.biallelic_snp_only}, minQ={params.min_q}." >&2
             echo "Lower config:snp_filter:min_q for Clair QUAL scale." >&2
             rm -f "$tmp_vcf"
             exit 1

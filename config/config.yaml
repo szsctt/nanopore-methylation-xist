@@ -1,7 +1,10 @@
 # Core inputs
 sample_table: "config/samples.tsv"
-reference_fasta: "resources/reference/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
-reference_url: "ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz"
+# This 194-contig primary assembly matches the contig dictionary in the
+# historical OTC3 VCF. In particular, it retains chrY PAR sequence, unlike
+# the previously used no-alt analysis set.
+reference_fasta: "resources/reference/GRCh38.primary_assembly.genome.fa"
+reference_url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/GRCh38.primary_assembly.genome.fa.gz"
 
 # Minimap2 settings
 minimap2:
@@ -13,10 +16,11 @@ xist_region:
   start: 73813879
   end: 73862026
 
-# SNP filtering prior to phasing and for the XIST subset
-# Defaults inferred from previous_results and can be tuned.
+# SNP filtering prior to phasing and for the XIST subset. This reconstructs
+# the published OTC3 chrX filter: biallelic SNPs with QUAL >= 751.
 snp_filter:
-  min_q: 750
+  min_q: 751
+  biallelic_snp_only: true
 
 # Clair2 settings (biocontainers/clair:2.1.1)
 clair:
@@ -53,10 +57,11 @@ threads:
 # Singularity sources (docker:// URIs).
 # Validate tags in your environment; adjust if your cluster caches different builds.
 containers:
-  minimap2: "docker://quay.io/biocontainers/minimap2:2.31--h118bc1c_0"
+  minimap2: "docker://quay.io/biocontainers/minimap2:2.18--h5bf99c6_0"
   samtools: "docker://quay.io/biocontainers/samtools:1.23.1--ha83d96e_0"
   vcftools: "docker://quay.io/biocontainers/vcftools:0.1.17--pl5321h077b44d_0"
-  whatshap: "docker://quay.io/biocontainers/whatshap:2.8--py312hf731ba3_0"
+  # WhatsHap 1.0 was available in early 2021; 1.1 was released later.
+  whatshap: "docker://quay.io/biocontainers/whatshap:1.0--py36hf1181ba_0"
   nanopolish: "docker://quay.io/biocontainers/nanopolish:0.14.0--h5ca1c30_6"
   clair: "docker://quay.io/biocontainers/clair:2.1.1--0"
   nanomethphase: "docker://docker.io/szsctt/nanomethphase:latest"
