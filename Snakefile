@@ -32,6 +32,7 @@ SAMPLES = load_samples(config["sample_table"])
 SAMPLE_NAMES = sorted(SAMPLES.keys())
 
 XIST = config["xist_region"]
+ANALYSIS = config.get("analysis_region", {"chrom": XIST["chrom"], "start": "", "end": ""})
 THREADS = config["threads"]
 CONTAINERS = config["containers"]
 REFERENCE_FASTA = config["reference_fasta"]
@@ -197,6 +198,36 @@ rule index_bam:
         """
 
 
+rule subset_region_bam:
+    # Genome-wide alignment is retained (reads must map against the whole
+    # reference); everything downstream operates on this analysis-region subset.
+    input:
+        bam=rules.sort_bam.output.bam,
+        bai=rules.index_bam.output.bai,
+    output:
+        bam="results/{sample}/alignment/{sample}.region.bam",
+        bai="results/{sample}/alignment/{sample}.region.bam.bai",
+    params:
+        region=(
+            f"{ANALYSIS['chrom']}:{ANALYSIS['start']}-{ANALYSIS['end']}"
+            if ANALYSIS.get("start", "") != "" and ANALYSIS.get("end", "") != ""
+            else ANALYSIS["chrom"]
+        ),
+    threads: 4
+    container:
+        CONTAINERS["samtools"]
+    log:
+        "logs/{sample}/subset_region_bam.log",
+    shell:
+        """
+        mkdir -p $(dirname {log})
+        (
+          samtools view -@ {threads} -b {input.bam} {params.region} -o {output.bam}
+          samtools index -@ {threads} {output.bam} {output.bai}
+        ) > {log} 2>&1
+        """
+
+
 rule download_clair_model:
     output:
         archive=CLAIR_MODEL_ARCHIVE,
@@ -278,7 +309,13 @@ rule call_clair:
     params:
         outdir=lambda wc: f"work/{wc.sample}/clair",
         raw_vcf=lambda wc: f"work/{wc.sample}/clair/{wc.sample}.vcf",
-        ctg=XIST["chrom"],
+        ctg=ANALYSIS["chrom"],
+        # Restrict calling to the analysis region
+        ctg_range_args=(
+            f"--ctgStart {ANALYSIS['start']} --ctgEnd {ANALYSIS['end']}"
+            if ANALYSIS.get("start", "") != "" and ANALYSIS.get("end", "") != ""
+            else ""
+        ),
         threshold=config["clair"].get("threshold", 0.125),
         min_coverage=config["clair"].get("min_coverage", 4),
         extra_args=config["clair"].get("extra_args", ""),
@@ -339,7 +376,7 @@ rule call_clair:
             --ref_fn {input.ref} \
             --bam_fn {input.bam} \
             --call_fn {params.raw_vcf} \
-            --ctgName {params.ctg} \
+            --ctgName {params.ctg} {params.ctg_range_args} \
             --sampleName {wildcards.sample} \
             --threads {threads} \
             --threshold={params.threshold} \
@@ -390,6 +427,9 @@ rule filter_snps_for_phasing:
             if config["snp_filter"].get("biallelic_snp_only", False)
             else ""
         ),
+        # No explicit region filter needed: call_clair already restricts calling
+        # to the analysis_region, so the phasing input is region-scoped, which is
+        # what keeps distant extra calls out of whatshap's read selection.
     container:
         CONTAINERS["vcftools"]
     log:
@@ -639,8 +679,8 @@ rule nanopolish_index:
 rule nanopolish_call_methylation:
     input:
         fastq=rules.stage_fastq.output.fastq,
-        bam=rules.sort_bam.output.bam,
-        bai=rules.index_bam.output.bai,
+        bam=rules.subset_region_bam.output.bam,
+        bai=rules.subset_region_bam.output.bai,
         ref=rules.download_reference.output.fasta,
         fai=rules.index_reference.output.fai,
         indexed=rules.nanopolish_index.output.done,
@@ -696,8 +736,8 @@ rule methyl_call_processor:
 
 rule nanomethphase_phase:
     input:
-        bam=rules.sort_bam.output.bam,
-        bai=rules.index_bam.output.bai,
+        bam=rules.subset_region_bam.output.bam,
+        bai=rules.subset_region_bam.output.bai,
         vcf=rules.bgzip_phase_vcf.output.vcf,
         vcf_tbi=rules.index_phase_vcf.output.tbi,
         meth_bed=rules.methyl_call_processor.output.bed,
@@ -709,6 +749,8 @@ rule nanomethphase_phase:
         hp2="results/{sample}/nanomethphase/{sample}_NanoMethPhase_HP2_MethylFrequency.tsv",
     params:
         prefix=lambda wc: f"results/{wc.sample}/nanomethphase/{wc.sample}",
+        min_snv=config["nanomethphase"].get("min_snv", 2),
+        expected_version=config["nanomethphase"].get("expected_version", "1.0"),
     threads: THREADS["nanomethphase_phase"]
     container:
         CONTAINERS["nanomethphase"]
@@ -719,6 +761,19 @@ rule nanomethphase_phase:
         mkdir -p $(dirname {log})
         (
           mkdir -p $(dirname {output.hp1})
+
+          # Fail loudly if the container is not the pinned NanoMethPhase build.
+          # See the config nanomethphase block and reproduction_progress.md.
+          nmp_ver=$(python3 -m nanomethphase --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+(\\.[0-9]+)?' | head -1)
+          echo "[INFO] nanomethphase version: $nmp_ver" >&2
+          case "$nmp_ver" in
+            {params.expected_version}|{params.expected_version}.*) : ;;
+            *) echo "ERROR: nanomethphase $nmp_ver != expected {params.expected_version}." >&2
+               echo "Build/pin containers:nanomethphase to v{params.expected_version} (see workflow/envs)." >&2
+               exit 1 ;;
+          esac
+
+          # v1.0 uses --min_SNV (default 2), the historical read-assignment.
           python3 -m nanomethphase phase \
             -b {input.bam} \
             -v {input.vcf} \
@@ -726,6 +781,7 @@ rule nanomethphase_phase:
             -r {input.ref} \
             -o {params.prefix} \
             -of methylcall \
+            -ms {params.min_snv} \
             -t {threads} \
             --overwrite
 

@@ -1,0 +1,28 @@
+# NanoMethPhase v1.0 (Jan 2021) with 2021-era dependencies.
+# This is the faithful historical environment for the OTC3 XIST reproduction.
+# Validated: reproduces the min_SNV=2 read-assignment and runs phase + dma.
+# Notes:
+#   - nanomethphase 1.0 is installed from PyPI (pinned).
+#   - bioconductor-dss 2.38.0 matches NanoMethPhase v1.0's own env (dss >=2.36).
+#   - pysam/numpy/htslib pinned to 2021 builds; changing them does not alter the
+#     XIST result (tested), but they are pinned for reproducibility.
+name: nanomethphase_v1.0
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.7
+  - numpy=1.20
+  - pysam=0.16.0.1
+  - pytabix=0.0.2
+  - htslib=1.11
+  - tabix
+  - tqdm=4.59
+  - samtools=1.11
+  - r-base=4.0
+  - bioconductor-dss=2.38.0
+  - r-r.utils
+  - r-sys
+  - pip
+  - pip:
+      - nanomethphase==1.0
