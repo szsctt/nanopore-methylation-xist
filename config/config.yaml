@@ -33,7 +33,7 @@ clair:
 # Clair2 ONT model (auto-fetched by workflow).
 clair_model:
   name: "ont_122HD34"
-  source_url: "http://www.bio8.cs.hku.hk/clair_models/ont/122HD34.tar"
+  source_url: "https://www.bio8.cs.hku.hk/clair_models/ont/122HD34.tar"
 
 # NanoMethPhase
 nanomethphase:
