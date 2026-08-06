@@ -1,6 +1,10 @@
 name: Build Custom NanoMethPhase Image
 
 on:
+  push:
+    paths:
+      - ".github/workflows/build-custom-tool-images.yml"
+      - "docker/nanomethphase.Dockerfile"
   workflow_dispatch:
     inputs:
       nanomethphase_ref:
