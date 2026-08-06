@@ -8,3 +8,9 @@ results
 work
 .parallel
 **cypython
+
+# Local singularity/apptainer images and scratch
+*.sif
+*.simg
+.keras/
+experiments/
