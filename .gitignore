@@ -8,3 +8,7 @@ results
 work
 .parallel
 **cypython
+*.sif
+**/*pyc
+**/*pyc
+**/*json

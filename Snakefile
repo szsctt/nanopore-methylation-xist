@@ -384,6 +384,12 @@ rule filter_snps_for_phasing:
         vcf=temp("results/{sample}/variants/{sample}.snps.filtered.vcf"),
     params:
         min_q=config["snp_filter"]["min_q"],
+        biallelic_snp_only=config["snp_filter"].get("biallelic_snp_only", False),
+        biallelic_snp_args=(
+            "--remove-indels --min-alleles 2 --max-alleles 2"
+            if config["snp_filter"].get("biallelic_snp_only", False)
+            else ""
+        ),
     container:
         CONTAINERS["vcftools"]
     log:
@@ -396,6 +402,7 @@ rule filter_snps_for_phasing:
           vcftools \
             --gzvcf {input.vcf} \
             --minQ {params.min_q} \
+            {params.biallelic_snp_args} \
             --recode \
             --recode-INFO-all \
             --stdout \
@@ -403,7 +410,8 @@ rule filter_snps_for_phasing:
 
           site_count=$(grep -vc '^#' "$tmp_vcf" || true)
           if [[ "${{site_count:-0}}" -eq 0 ]]; then
-            echo "No variants passed filter_snps_for_phasing (--minQ {params.min_q})." >&2
+            echo "No variants passed filter_snps_for_phasing." >&2
+            echo "Filter: biallelic_snp_only={params.biallelic_snp_only}, minQ={params.min_q}." >&2
             echo "Lower config:snp_filter:min_q for Clair QUAL scale." >&2
             rm -f "$tmp_vcf"
             exit 1
@@ -777,6 +785,8 @@ rule nanomethphase_dma:
         outdir=lambda wc: f"results/{wc.sample}/dma",
         prefix=lambda wc: f"{wc.sample}_XIST",
         columns=config["dma"]["columns"],
+        dss_version=config["dma"].get("dss_version", "2.58.0"),
+        rscript=config["dma"].get("rscript", "Rscript"),
     threads: THREADS["dma"]
     container:
         CONTAINERS["nanomethphase"]
@@ -787,12 +797,14 @@ rule nanomethphase_dma:
         mkdir -p $(dirname {log})
         (
           mkdir -p {params.outdir}
+          {params.rscript} -e "v <- as.character(packageVersion('DSS')); cat('DSS version:', v, '\\n'); if (!identical(v, '{params.dss_version}')) stop(paste('Expected DSS', '{params.dss_version}', 'got', v))"
           python3 -m nanomethphase dma \
             -c {params.columns} \
             -ca {input.hp1} \
             -co {input.hp2} \
             -o {params.outdir} \
             -op {params.prefix} \
+            --Rscript {params.rscript} \
             -ow
 
           test -s {output.dml}
