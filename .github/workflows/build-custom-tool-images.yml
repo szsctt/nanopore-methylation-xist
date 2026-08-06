@@ -6,7 +6,7 @@ on:
       nanomethphase_ref:
         description: "Git ref for vahidAK/NanoMethPhase (branch, tag, or SHA)"
         required: false
-        default: "master"
+        default: "v1.0"
       push_latest:
         description: "Also push :latest tags"
         required: false
@@ -25,7 +25,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - default_ref: master
+          # v1.0 is the historical (2021) NanoMethPhase release, pinned for the
+          # OTC3 XIST reproduction. The Dockerfile pins DSS 2.38.0 / R 4.0 to
+          # match. Do NOT use :latest downstream (it drifts); pin by :v1.0 tag
+          # or digest. See reproduction_progress.md.
+          - default_ref: v1.0
             build_context: .
             dockerfile: docker/nanomethphase.Dockerfile
             image_name: nanomethphase
