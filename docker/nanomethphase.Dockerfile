@@ -1,9 +1,15 @@
 # Custom multi-stage image for NanoMethPhase runtime.
-# Build dependencies stay in builder stage.
+# Build dependencies stay in the builder stage.
+
+# Faithful 2021 build for the OTC3 XIST reproduction:
+#   NanoMethPhase v1.0 (Jan 2021, the only 2021 release; --min_SNV default 2)
+#   with 2021-era dependencies and DSS 2.38.0 (Bioconductor 3.12, needs R 4.0).
+# v1.0's setup.py declares no install_requires, so the Python deps are pinned
+# explicitly below. See reproduction_progress.md.
 
 FROM ubuntu:20.04 AS builder
 ARG DEBIAN_FRONTEND=noninteractive
-ARG NANOMETHPHASE_REF=master
+ARG NANOMETHPHASE_REF=v1.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -26,14 +32,17 @@ ENV PATH="/opt/venv/bin:${PATH}"
 
 RUN pip install --no-cache-dir --upgrade "pip<24" "setuptools<60" "wheel<0.38"
 RUN pip install --no-cache-dir "numpy==1.18.5"
+# v1.0 declares no install_requires; pin its runtime deps explicitly (2021-era).
+RUN pip install --no-cache-dir "pysam==0.16.0.1" "pytabix==0.0.2" "tqdm==4.59.0"
 RUN pip install --no-cache-dir \
     "git+https://github.com/vahidAK/NanoMethPhase.git@${NANOMETHPHASE_REF}" \
-    whatshap
+    "whatshap==1.0"
 
 
 FROM ubuntu:20.04
 ARG DEBIAN_FRONTEND=noninteractive
-ARG DSS_VERSION=2.58.0
+ARG DSS_VERSION=2.38.0
+ARG R_VERSION=4.0
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -55,7 +64,7 @@ RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest \
     | tar -xj -C /usr/local/bin --strip-components=1 bin/micromamba
 
 RUN micromamba create -y -p /opt/mamba/envs/dss -c conda-forge -c bioconda \
-      r-base=4.5 \
+      r-base=${R_VERSION} \
       bioconductor-dss=${DSS_VERSION} \
       r-sys \
       r-r.utils \

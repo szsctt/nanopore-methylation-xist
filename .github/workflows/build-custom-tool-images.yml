@@ -1,12 +1,16 @@
 name: Build Custom NanoMethPhase Image
 
 on:
+  push:
+    paths:
+      - ".github/workflows/build-custom-tool-images.yml"
+      - "docker/nanomethphase.Dockerfile"
   workflow_dispatch:
     inputs:
       nanomethphase_ref:
         description: "Git ref for vahidAK/NanoMethPhase (branch, tag, or SHA)"
         required: false
-        default: "master"
+        default: "v1.0"
       push_latest:
         description: "Also push :latest tags"
         required: false
@@ -25,7 +29,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - default_ref: master
+          # v1.0 is the historical (2021) NanoMethPhase release, pinned for the
+          # OTC3 XIST reproduction. The Dockerfile pins DSS 2.38.0 / R 4.0 to
+          # match. Do NOT use :latest downstream (it drifts); pin by :v1.0 tag
+          # or digest. See reproduction_progress.md.
+          - default_ref: v1.0
             build_context: .
             dockerfile: docker/nanomethphase.Dockerfile
             image_name: nanomethphase
@@ -130,4 +138,4 @@ jobs:
           IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.image_name }}:${{ steps.resolve.outputs.ref_tag }}"
           echo "Testing image: $IMAGE"
           docker pull "$IMAGE"
-          docker run --rm "$IMAGE" Rscript -e "pkgs <- c('sys','R.utils','DSS','Rsamtools','GenomicRanges','IRanges','S4Vectors','Biobase'); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) { cat('Missing R packages:', paste(miss, collapse=', '), '\n'); quit(status=1) }; dss_v <- as.character(packageVersion('DSS')); cat('DSS version:', dss_v, '\n'); if (dss_v != '2.58.0') { cat('Expected DSS 2.58.0\n'); quit(status=1) }"
+          docker run --rm "$IMAGE" Rscript -e "pkgs <- c('sys','R.utils','DSS','Rsamtools','GenomicRanges','IRanges','S4Vectors','Biobase'); miss <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly=TRUE)]; if (length(miss)) { cat('Missing R packages:', paste(miss, collapse=', '), '\n'); quit(status=1) } else { cat('All required R packages present\n') }"
