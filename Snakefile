@@ -762,16 +762,16 @@ rule nanomethphase_phase:
         (
           mkdir -p $(dirname {output.hp1})
 
-          # Fail loudly if the container is not the pinned NanoMethPhase build.
-          # See the config nanomethphase block and reproduction_progress.md.
-          nmp_ver=$(python3 -m nanomethphase --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+(\\.[0-9]+)?' | head -1)
-          echo "[INFO] nanomethphase version: $nmp_ver" >&2
-          case "$nmp_ver" in
-            {params.expected_version}|{params.expected_version}.*) : ;;
-            *) echo "ERROR: nanomethphase $nmp_ver != expected {params.expected_version}." >&2
-               echo "Build/pin containers:nanomethphase to v{params.expected_version} (see workflow/envs)." >&2
-               exit 1 ;;
-          esac
+          # Guard the pinned build. v1.0 has no --version, so verify the v1.0
+          # read-assignment option instead: v1.0 exposes --min_SNV, which v1.1.0+
+          # renamed to --min_variant. See config nanomethphase / reproduction_progress.md.
+          help_out=$(python3 -m nanomethphase phase --help 2>&1 || true)
+          if [[ "$help_out" != *"--min_SNV"* ]]; then
+            echo "ERROR: nanomethphase build lacks --min_SNV; expected v{params.expected_version}." >&2
+            echo "v1.1.0+ renamed it --min_variant. Pin containers:nanomethphase to a v1.0 build." >&2
+            exit 1
+          fi
+          echo "[INFO] nanomethphase v{params.expected_version} confirmed (--min_SNV present)" >&2
 
           # v1.0 uses --min_SNV (default 2), the historical read-assignment.
           python3 -m nanomethphase phase \
