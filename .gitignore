@@ -7,10 +7,13 @@ logs
 results
 work
 .parallel
-**cypython
+**/__pycache__
 
 # Local singularity/apptainer images and scratch
 *.sif
 *.simg
 .keras/
 experiments/
+
+# Manuscript and correspondence (inputs, not tracked)
+background/

@@ -7,22 +7,40 @@ reference_url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/releas
 minimap2:
   preset: "map-ont"
 
-# XIST gene (used for the XIST VCF subset and DMA).
-xist_region:
-  chrom: "chrX"
-  start: 73813879
-  end: 73862026
+# Loci analysed. Each locus runs end-to-end independently, with three windows:
+#   phase_region  BAM subset -> Clair calling -> WhatsHap phasing -> nanopolish
+#                 -> NanoMethPhase read tagging. 
+#   dma_region    CpGs handed to DSS (DMLtest/callDMR) and the locus VCF subset.
+#   plot_region   display window for Figure 1 (gene +/- ~2 kb, as published).
+loci:
+  XIST:
+    chrom: "chrX"
+    phase_region:
+      start: 72800000
+      end: 74200000
+    dma_region:
+      start: 73813879
+      end: 73862026
+    plot_region:
+      start: 73818651
+      end: 73854753
+  OTC:
+    chrom: "chrX"
+    phase_region:
+      start: 38100000
+      end: 38560000
+    dma_region:
+      start: 38350604
+      end: 38423446
+    plot_region:
+      start: 38350604
+      end: 38423446
+    display_swap_haplotypes: true
 
-# Phasing/XIST SNP filter: biallelic SNPs with QUAL >= 751
+# Phasing/locus SNP filter: biallelic SNPs with QUAL >= 751
 snp_filter:
   min_q: 751
   biallelic_snp_only: true
-
-# Region the workflow operates over after alignment
-analysis_region:
-  chrom: "chrX"
-  start: 72800000
-  end: 74200000
 
 # Clair2 settings (biocontainers/clair:2.1.1)
 clair:
@@ -35,16 +53,21 @@ clair_model:
   name: "ont_122HD34"
   source_url: "https://www.bio8.cs.hku.hk/clair_models/ont/122HD34.tar"
 
-# NanoMethPhase
+# NanoMethPhase settings 
 nanomethphase:
   min_snv: 2
-  expected_version: "1.0"
 
 # NanoMethPhase DMA settings
 dma:
   columns: "1,2,4,5,7"
-  dss_version: "2.38.0"
   rscript: "Rscript"
+  pval_cutoff: 0.001
+  fdr_report_threshold: 0.05
+
+# GENCODE annotation used for the Figure 1 gene model track
+annotation:
+  gtf_url: "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_38/gencode.v38.basic.annotation.gtf.gz"
+  gtf: "resources/annotation/gencode.v38.basic.annotation.gtf.gz"
 
 threads:
   align: 16
@@ -61,7 +84,7 @@ containers:
   minimap2: "docker://quay.io/biocontainers/minimap2:2.18--h5bf99c6_0"
   samtools: "docker://quay.io/biocontainers/samtools:1.23.1--ha83d96e_0"
   vcftools: "docker://quay.io/biocontainers/vcftools:0.1.17--pl5321h077b44d_0"
-  whatshap: "docker://quay.io/biocontainers/whatshap:1.0--py36hf1181ba_0"  # historical version (from published VCF header)
+  whatshap: "docker://quay.io/biocontainers/whatshap:1.0--py36hf1181ba_0"  
   nanopolish: "docker://quay.io/biocontainers/nanopolish:0.14.0--h5ca1c30_6"
   clair: "docker://quay.io/biocontainers/clair:2.1.1--0"
   nanomethphase: "docker://docker.io/szsctt/nanomethphase:v1.0"  # build via docker/nanomethphase.Dockerfile; not :latest
