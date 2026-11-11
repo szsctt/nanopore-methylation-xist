@@ -17,3 +17,6 @@ experiments/
 
 # Manuscript and correspondence (inputs, not tracked)
 background/
+
+# SRA upload staging (large)
+sra_staging/
